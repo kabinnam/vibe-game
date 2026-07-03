@@ -1,0 +1,138 @@
+[gd_scene load_steps=19 format=3 uid="uid://barena001"]
+
+[ext_resource type="StandardMaterial3D" uid="uid://cfloormat001" path="res://Resources/Materials/FloorMaterial.tres" id="1"]
+[ext_resource type="StandardMaterial3D" uid="uid://cwallmat001" path="res://Resources/Materials/WallMaterial.tres" id="2"]
+[ext_resource type="StandardMaterial3D" uid="uid://crampmat001" path="res://Resources/Materials/RampMaterial.tres" id="3"]
+[ext_resource type="StandardMaterial3D" uid="uid://cplatmat001" path="res://Resources/Materials/PlatformMaterial.tres" id="4"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_floor"]
+size = Vector3(20, 0.5, 20)
+material = ExtResource("1")
+
+[sub_resource type="BoxShape3D" id="BoxShape_floor"]
+size = Vector3(20, 0.5, 20)
+
+[sub_resource type="BoxMesh" id="BoxMesh_nswall"]
+size = Vector3(20, 3, 0.5)
+material = ExtResource("2")
+
+[sub_resource type="BoxShape3D" id="BoxShape_nswall"]
+size = Vector3(20, 3, 0.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ewwall"]
+size = Vector3(0.5, 3, 20)
+material = ExtResource("2")
+
+[sub_resource type="BoxShape3D" id="BoxShape_ewwall"]
+size = Vector3(0.5, 3, 20)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ramp"]
+size = Vector3(2, 0.3, 4.5)
+material = ExtResource("3")
+
+[sub_resource type="BoxShape3D" id="BoxShape_ramp"]
+size = Vector3(2, 0.3, 4.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_landing"]
+size = Vector3(4, 0.5, 2.5)
+material = ExtResource("4")
+
+[sub_resource type="BoxShape3D" id="BoxShape_landing"]
+size = Vector3(4, 0.5, 2.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_lowplat"]
+size = Vector3(3, 1, 3)
+material = ExtResource("4")
+
+[sub_resource type="BoxShape3D" id="BoxShape_lowplat"]
+size = Vector3(3, 1, 3)
+
+[sub_resource type="BoxMesh" id="BoxMesh_medplat"]
+size = Vector3(2.5, 2, 2.5)
+material = ExtResource("4")
+
+[sub_resource type="BoxShape3D" id="BoxShape_medplat"]
+size = Vector3(2.5, 2, 2.5)
+
+[node name="Arena" type="Node3D"]
+
+[node name="Floor" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("BoxShape_floor")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("BoxMesh_floor")
+
+[node name="NorthWall" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NorthWall"]
+shape = SubResource("BoxShape_nswall")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="NorthWall"]
+mesh = SubResource("BoxMesh_nswall")
+
+[node name="SouthWall" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SouthWall"]
+shape = SubResource("BoxShape_nswall")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SouthWall"]
+mesh = SubResource("BoxMesh_nswall")
+
+[node name="EastWall" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="EastWall"]
+shape = SubResource("BoxShape_ewwall")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="EastWall"]
+mesh = SubResource("BoxMesh_ewwall")
+
+[node name="WestWall" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WestWall"]
+shape = SubResource("BoxShape_ewwall")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WestWall"]
+mesh = SubResource("BoxMesh_ewwall")
+
+[node name="Ramp" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.9063, -0.4226, 0, 0.4226, 0.9063, 6, 1, -5.5)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ramp"]
+shape = SubResource("BoxShape_ramp")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ramp"]
+mesh = SubResource("BoxMesh_ramp")
+
+[node name="RampLanding" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.75, -8.75)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="RampLanding"]
+shape = SubResource("BoxShape_landing")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="RampLanding"]
+mesh = SubResource("BoxMesh_landing")
+
+[node name="LowPlatform" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.5, 5)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="LowPlatform"]
+shape = SubResource("BoxShape_lowplat")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="LowPlatform"]
+mesh = SubResource("BoxMesh_lowplat")
+
+[node name="MediumPlatform" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, -4)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MediumPlatform"]
+shape = SubResource("BoxShape_medplat")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="MediumPlatform"]
+mesh = SubResource("BoxMesh_medplat")

@@ -1,0 +1,21 @@
+# Godot 4 generated files
+.godot/
+
+# Godot 3 generated files (in case of migration)
+.mono/
+.import/
+
+# C# / .NET build output
+bin/
+obj/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+*.swp
+*.swo
+*~
+.vscode/
+.idea/

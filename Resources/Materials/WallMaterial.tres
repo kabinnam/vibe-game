@@ -1,0 +1,4 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://cwallmat001"]
+
+[resource]
+albedo_color = Color(0.45, 0.55, 0.65, 1)
