@@ -57,6 +57,7 @@ size = Vector3(2.5, 2, 2.5)
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_e77km"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_qtpfr"]
+material = ExtResource("4")
 
 [node name="Arena" type="Node3D" unique_id=903023996]
 
@@ -144,7 +145,7 @@ shape = SubResource("BoxShape_medplat")
 mesh = SubResource("BoxMesh_medplat")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=102045405]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8258364, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.3887181, 0.8258364, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=1738722449]
 shape = SubResource("CylinderShape3D_e77km")
