@@ -8,10 +8,12 @@ public partial class PlayerController : CharacterBody3D
     [Export] public float Gravity = 9.8f;
 
     private Node3D _head;
+    private VapeArmController _vapeArm;
 
     public override void _Ready()
     {
         _head = GetNode<Node3D>("Head");
+        _vapeArm = GetNode<VapeArmController>("Head/ArmPivot");
         Input.MouseMode = Input.MouseModeEnum.Captured;
     }
 
@@ -19,11 +21,19 @@ public partial class PlayerController : CharacterBody3D
     {
         if (@event is InputEventMouseMotion mouseMotion)
         {
-            RotateY(-mouseMotion.Relative.X * MouseSensitivity);
-            _head.RotateX(-mouseMotion.Relative.Y * MouseSensitivity);
-            var rot = _head.Rotation;
-            rot.X = Mathf.Clamp(rot.X, Mathf.DegToRad(-90f), Mathf.DegToRad(90f));
-            _head.Rotation = rot;
+            if (_vapeArm.IsVaping)
+            {
+                // While vaping, the mouse drives the arm instead of the camera.
+                _vapeArm.AddMouseImpulse(-mouseMotion.Relative.Y);
+            }
+            else
+            {
+                RotateY(-mouseMotion.Relative.X * MouseSensitivity);
+                _head.RotateX(-mouseMotion.Relative.Y * MouseSensitivity);
+                var rot = _head.Rotation;
+                rot.X = Mathf.Clamp(rot.X, Mathf.DegToRad(-90f), Mathf.DegToRad(90f));
+                _head.Rotation = rot;
+            }
         }
 
         if (@event.IsActionPressed("ui_cancel"))

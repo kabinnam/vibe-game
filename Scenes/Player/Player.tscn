@@ -1,10 +1,45 @@
-[gd_scene load_steps=3 format=3 uid="uid://bplayer001"]
+[gd_scene load_steps=11 format=3 uid="uid://bplayer001"]
 
 [ext_resource type="Script" path="res://Scenes/Player/PlayerController.cs" id="1"]
+[ext_resource type="Script" path="res://Scenes/Player/VapeArmController.cs" id="2"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.35
 height = 1.8
+
+[sub_resource type="StandardMaterial3D" id="ArmMaterial"]
+albedo_color = Color(0.87, 0.68, 0.54, 1)
+
+[sub_resource type="StandardMaterial3D" id="VapeMaterial"]
+albedo_color = Color(0.15, 0.15, 0.18, 1)
+metallic = 0.6
+roughness = 0.3
+
+[sub_resource type="BoxMesh" id="ArmMesh"]
+material = SubResource("ArmMaterial")
+size = Vector3(0.07, 0.55, 0.07)
+
+[sub_resource type="BoxMesh" id="VapeMesh"]
+material = SubResource("VapeMaterial")
+size = Vector3(0.03, 0.12, 0.03)
+
+[sub_resource type="StandardMaterial3D" id="SmokeMaterial"]
+transparency = 1
+albedo_color = Color(0.8, 0.8, 0.82, 0.35)
+
+[sub_resource type="SphereMesh" id="SmokeMesh"]
+material = SubResource("SmokeMaterial")
+radius = 0.06
+height = 0.12
+
+[sub_resource type="ParticleProcessMaterial" id="SmokeProcess"]
+direction = Vector3(0, 1, 0.3)
+spread = 25.0
+initial_velocity_min = 0.4
+initial_velocity_max = 0.9
+gravity = Vector3(0, 0.4, 0)
+scale_min = 0.6
+scale_max = 1.8
 
 [node name="Player" type="CharacterBody3D"]
 script = ExtResource("1")
@@ -17,3 +52,44 @@ shape = SubResource("CapsuleShape3D_1")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 
 [node name="Camera3D" type="Camera3D" parent="Head"]
+
+[node name="ArmPivot" type="Node3D" parent="Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, -0.25, -0.1)
+script = ExtResource("2")
+
+[node name="Arm" type="MeshInstance3D" parent="Head/ArmPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.275, 0)
+mesh = SubResource("ArmMesh")
+
+[node name="Vape" type="MeshInstance3D" parent="Head/ArmPivot/Arm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.3, -0.05)
+mesh = SubResource("VapeMesh")
+
+[node name="SmokePuff" type="GPUParticles3D" parent="Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, -0.35)
+emitting = false
+amount = 24
+lifetime = 1.6
+one_shot = true
+explosiveness = 0.9
+process_material = SubResource("SmokeProcess")
+draw_pass_1 = SubResource("SmokeMesh")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="VapeMeter" type="ProgressBar" parent="HUD"]
+visible = false
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_top = -60.0
+offset_right = 150.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 0
+max_value = 1.0
+step = 0.001
+show_percentage = false
