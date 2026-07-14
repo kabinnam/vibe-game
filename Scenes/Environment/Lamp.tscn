@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://vykpfhwc1w65"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_b1kcs"]
+top_radius = 0.25
+bottom_radius = 0.25
+height = 0.1
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5l2rw"]
+emission_enabled = true
+emission = Color(1, 0.92156863, 0.81960785, 1)
+emission_energy_multiplier = 3.0
+
+[node name="Lamp" type="SpotLight3D" unique_id=1565578640 groups=["lights"]]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, 0)
+light_color = Color(1, 0.92156863, 0.81960785, 1)
+light_energy = 4.0
+shadow_enabled = true
+spot_range = 11.0
+spot_angle = 40.0
+
+[node name="Fixture" type="MeshInstance3D" parent="." unique_id=383244097]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0)
+mesh = SubResource("CylinderMesh_b1kcs")
+surface_material_override/0 = SubResource("StandardMaterial3D_5l2rw")
