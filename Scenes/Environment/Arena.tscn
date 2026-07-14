@@ -3,6 +3,8 @@
 [ext_resource type="Material" uid="uid://cfloormat001" path="res://Resources/Materials/FloorMaterial.tres" id="1"]
 [ext_resource type="Material" uid="uid://cwallmat001" path="res://Resources/Materials/WallMaterial.tres" id="2"]
 [ext_resource type="Material" uid="uid://cplatmat001" path="res://Resources/Materials/PlatformMaterial.tres" id="4"]
+[ext_resource type="PackedScene" uid="uid://ccrate1000001" path="res://Scenes/Environment/Crate.tscn" id="5"]
+[ext_resource type="PackedScene" uid="uid://cstore1000001" path="res://Scenes/Environment/StorageRoom.tscn" id="6"]
 
 [node name="Arena" type="Node3D" unique_id=546737026]
 
@@ -57,7 +59,40 @@ operation = 2
 size = Vector3(24, 1, 14)
 
 [node name="Ramp" type="CSGPolygon3D" parent="." unique_id=1941537949]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, -0.02, -1.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, -1.5)
 use_collision = true
-polygon = PackedVector2Array(0, 0, 8, 1, 8, 4)
+polygon = PackedVector2Array(0, 0, 8, 4, 8, 3.7, 0.6, 0)
 depth = 3.0
+
+[node name="StorageRoom1" parent="." unique_id=95682410 instance=ExtResource("6")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, -8)
+
+[node name="StorageRoom2" parent="." unique_id=1342625106 instance=ExtResource("6")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, -8)
+
+[node name="StorageRoom3" parent="." unique_id=1517290416 instance=ExtResource("6")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -8)
+
+[node name="Crate1" parent="." unique_id=1094174577 instance=ExtResource("5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0.6, 5)
+
+[node name="Crate2" parent="." unique_id=619693013 instance=ExtResource("5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.8, 0.6, 5)
+
+[node name="Crate3" parent="." unique_id=324878703 instance=ExtResource("5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 1.8, 5)
+
+[node name="Crate4" parent="." unique_id=2028502180 instance=ExtResource("5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.3651683, 0.6, -0.019065142)
+
+[node name="Crate5" parent="." unique_id=115885571 instance=ExtResource("5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5651684, 0.6, -0.019065142)
+
+[node name="Crate6" parent="." unique_id=484271423 instance=ExtResource("5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 7)
+
+[node name="Crate7" parent="." unique_id=924698865 instance=ExtResource("5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 4.6, -6.2846537)
+
+[node name="Crate8" parent="." unique_id=539292137 instance=ExtResource("5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 4.6, -8.5)
