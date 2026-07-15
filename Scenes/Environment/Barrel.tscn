@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://cn5ikscjaeeqx"]
+
+[ext_resource type="Material" uid="uid://h43idtqdou5g" path="res://Resources/Materials/BarrelMaterial.tres" id="1_ufskg"]
+
+[node name="CSGCylinder3D" type="CSGCylinder3D" unique_id=976043385]
+use_collision = true
+radius = 0.3
+height = 0.9
+sides = 20
+material = ExtResource("1_ufskg")
