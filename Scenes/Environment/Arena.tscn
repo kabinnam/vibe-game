@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" uid="uid://cstore1000001" path="res://Scenes/Environment/StorageRoom.tscn" id="6"]
 [ext_resource type="PackedScene" uid="uid://cn5ikscjaeeqx" path="res://Scenes/Environment/Barrel.tscn" id="6_k7jiq"]
 [ext_resource type="PackedScene" uid="uid://vykpfhwc1w65" path="res://Scenes/Environment/Lamp.tscn" id="7_3s5ue"]
+[ext_resource type="PackedScene" uid="uid://dvq0sdumientq" path="res://Scenes/Enemies/Guard.tscn" id="8_0hfyg"]
 
 [node name="Arena" type="Node3D" unique_id=546737026]
 
@@ -137,3 +138,6 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 7, 7
 
 [node name="LampMezz" parent="." unique_id=1247229894 instance=ExtResource("7_3s5ue")]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 13, 7.9, 4)
+
+[node name="Guard" parent="." unique_id=1480189877 instance=ExtResource("8_0hfyg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.103663, -2.3841858e-07, 0.0021688938)
