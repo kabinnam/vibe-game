@@ -140,4 +140,4 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 7, 7
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 13, 7.9, 4)
 
 [node name="Guard" parent="." unique_id=1480189877 instance=ExtResource("8_0hfyg")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.103663, -2.3841858e-07, 0.0021688938)
+transform = Transform3D(-0.97948235, 0, 0.2015304, 0, 1, 0, -0.2015304, 0, -0.97948235, -7.225407, -2.3841858e-07, 2.2763398)
