@@ -1,18 +1,16 @@
 using Godot;
 
-/// <summary>
-/// A guard NPC with a vision cone and a four-state awareness model
-/// (Patrol -> Suspicious -> Targeting -> Searching). Detection is a gradual,
-/// distance-scaled meter; line of sight is verified by sampling several points on
-/// the player's body and raycasting, so cover genuinely hides the player.
-/// Locomotion (patrol/investigate movement) is added in a later navigation pass.
-/// </summary>
+// A guard NPC with a vision cone and a four-state awareness model
+// (Patrol -> Suspicious -> Targeting -> Searching). Detection is a gradual, distance-scaled
+// meter; line of sight is verified by sampling several points on the player's body and
+// raycasting, so cover genuinely hides the player. The guard patrols a waypoint loop,
+// investigates, and chases using its NavigationAgent3D (with RVO avoidance).
 public partial class Guard : CharacterBody3D
 {
-	/// <summary>Awareness levels, in escalating order.</summary>
+	// Awareness levels, in escalating order.
 	public enum State
 	{
-		Patrol,      // unaware; idle / patrol
+		Patrol,      // unaware; walking the waypoint loop
 		Suspicious,  // first-time ramp: meter fills gradually while the player is seen
 		Targeting,   // fully spotted (meter == 1)
 		Searching,   // post-Targeting cooldown after losing sight; re-sight snaps back instantly
@@ -20,22 +18,24 @@ public partial class Guard : CharacterBody3D
 
 	private State _state = State.Patrol;
 
-	/// <summary>How far the guard can see, in meters.</summary>
-	[Export] public float ViewDistance = 8f;
+	// --- Perception tuning (Inspector-editable) ---
+	[Export] public float ViewDistance = 8f;    // how far the guard can see, in meters
+	[Export] public float ViewAngleDeg = 28f;   // half-angle of the vision cone (full FOV is twice this)
+	[Export] public float DetectRate = 1.5f;    // detection gained/sec at point-blank (scaled by distance)
+	[Export] public float DecayRate = 0.5f;     // detection lost/sec while the player is not visible
 
-	/// <summary>Half-angle of the vision cone, in degrees (full field of view is twice this).</summary>
-	[Export] public float ViewAngleDeg = 28f;
+	// --- Movement tuning (Inspector-editable) ---
+	[Export] public float PatrolSpeed = 1.5f;      // walk speed on patrol (player is 5.0)
+	[Export] public float SuspiciousSpeed = 1f;  // creep speed while investigating
+	[Export] public float ChaseSpeed = 4.5f;       // pursuit speed (a hair faster than the player)
+	[Export] public float SearchSpeed = 3f;      // travel speed to the last-seen spot
 
-	/// <summary>Detection gained per second at point-blank range (scaled down with distance).</summary>
-	[Export] public float DetectRate = 1.5f;
+	[Export] public Godot.Collections.Array<Marker3D> Waypoints = new();  // per-guard patrol route (order matters)
+	[Export] public float ScanArcDeg = 70f;    // how far left/right the "look around" sweep turns
+	[Export] public float ScanSeconds = 2.0f;  // how long one sweep lasts
 
-	/// <summary>Detection lost per second while the player is not visible.</summary>
-	[Export] public float DecayRate = 0.5f;
-
-	/// <summary>
-	/// Local offsets sampled on the player's body (feet / torso / head). Seeing ANY one of
-	/// them counts as "seen", so a player peeking over low cover is still detected.
-	/// </summary>
+	// Points sampled on the player's body (feet / torso / head). Seeing ANY one counts as
+	// "seen", so a player peeking over low cover is still detected.
 	private static readonly Vector3[] SamplePoints =
 	{
 		new Vector3(0f, 0.2f, 0f),   // low
@@ -43,31 +43,39 @@ public partial class Guard : CharacterBody3D
 		new Vector3(0f, 1.7f, 0f),   // head
 	};
 
-	/// <summary>Awareness meter in the range [0, 1]; 1 means fully alerted.</summary>
-	private float _detection = 0f;
+	private float _detection = 0f;       // awareness meter in [0, 1]; 1 = fully alerted
+	private Vector3 _lastSeenPos;        // where the player was most recently seen (used by Searching)
+	private bool _playerVisible;         // did the player pass the full see-check this frame?
 
-	/// <summary>World position where the player was most recently seen (used by Searching).</summary>
-	private Vector3 _lastSeenPos;
+	private int _wp = 0;                 // index of the current patrol waypoint
+	private float _scanTimer = 0f;       // progress through the current look-around sweep
+	private float _baseYaw;              // facing captured when a scan starts (sweep centers on it)
+	private const float Gravity = 9.8f;  // downward accel so the guard stays on the floor
 
-	/// <summary>Whether the player passed the full see-check this frame.</summary>
-	private bool _playerVisible;
+	private NavigationAgent3D _agent;    // pathfinding component (set in _Ready)
+	private Node3D _eyes;                // vision origin (child node at eye height)
+	private Node3D _player;              // cached player reference (found via the "player" group)
+	private MeshInstance3D _cone;        // debug vision-cone mesh (generated in code)
+	private StandardMaterial3D _coneMat; // debug cone material (recolored per state)
+	private Label3D _label;              // debug readout floating above the guard
 
-	private Node3D _eyes;                 // vision origin (child node at eye height)
-	private Node3D _player;               // cached player reference (found via the "player" group)
-	private MeshInstance3D _cone;         // debug vision-cone mesh (generated in code)
-	private StandardMaterial3D _coneMat;  // debug cone material (recolored per state)
-	private Label3D _label;               // debug readout floating above the guard
-
-	/// <summary>Godot lifecycle: runs once when the node enters the scene tree.</summary>
+	// Runs once when the guard enters the scene tree (Godot lifecycle).
 	public override void _Ready()
 	{
 		_eyes = GetNode<Node3D>("Eyes");
 		_player = GetTree().GetFirstNodeInGroup("player") as Node3D;
 		BuildVisionCone();
 		BuildDebugLabel();
+
+		_agent = GetNode<NavigationAgent3D>("NavigationAgent3D");
+		_agent.AvoidanceEnabled = true;                 // steer around other agents (RVO)
+		_agent.Radius = 0.45f;                          // avoidance space the guard wants around itself
+		_agent.Height = 1.8f;
+		_agent.MaxSpeed = ChaseSpeed;                   // avoidance clamps to this; set to the fastest speed
+		_agent.VelocityComputed += OnVelocityComputed;  // "here's your collision-safe velocity" signal
 	}
 
-	/// <summary>Godot lifecycle: fixed-timestep tick (~60/sec) for physics and AI logic.</summary>
+	// Fixed-timestep tick (~60/sec) for physics and AI (Godot lifecycle).
 	public override void _PhysicsProcess(double delta)
 	{
 		UpdatePerception(delta);
@@ -75,11 +83,8 @@ public partial class Guard : CharacterBody3D
 		UpdateDebug();
 	}
 
-	/// <summary>
-	/// Advances the awareness meter and state machine for this frame. The first detection ramps
-	/// up gradually in <see cref="State.Suspicious"/>; only <see cref="State.Searching"/> re-locks
-	/// instantly to <see cref="State.Targeting"/> on re-sight.
-	/// </summary>
+	// Advances the awareness meter and state machine. First detection ramps up gradually in
+	// Suspicious; only Searching re-locks instantly to Targeting on re-sight.
 	private void UpdatePerception(double delta)
 	{
 		bool seen = CanSeePlayer();
@@ -119,36 +124,109 @@ public partial class Guard : CharacterBody3D
 		_detection = Mathf.Clamp(_detection, 0f, 1f);   // keep within [0, 1]
 	}
 
-	/// <summary>
-	/// Proximity multiplier for detection speed: 1 at the guard, falling off linearly to a
-	/// 0.15 floor at the edge of <see cref="ViewDistance"/> (closer = detected faster).
-	/// </summary>
+	// Proximity multiplier for detection speed: 1 at the guard, down to a 0.15 floor at max range.
 	private float DistanceFactor()
 	{
 		float d = _eyes.GlobalPosition.DistanceTo(_player.GlobalPosition);
 		return Mathf.Clamp(1f - d / ViewDistance, 0.15f, 1f);
 	}
 
-	/// <summary>Per-state behavior. Movement is added with the navigation milestone.</summary>
+	// Picks a movement target + speed per state (or scans when arrived).
 	private void ApplyBehavior()
 	{
 		switch (_state)
 		{
 			case State.Patrol:
-				Patrol();
+				PatrolStep();
 				break;
 			case State.Suspicious:
+				MoveTo(_lastSeenPos, SuspiciousSpeed);   // creep toward the last-seen spot (= the player while visible)
+				break;
 			case State.Targeting:
+				if (_player != null) MoveTo(_player.GlobalPosition, ChaseSpeed);   // chase the live position
+				break;
 			case State.Searching:
-				// Track the live player only while actually visible; otherwise face the last
-				// known position so the guard can't watch the player through walls.
-				if (_playerVisible && _player != null) FaceToward(_player.GlobalPosition);
-				else FaceToward(_lastSeenPos);
+				SearchStep();
 				break;
 		}
 	}
 
-	/// <summary>Yaws the guard to face a world position, staying upright (ignores height).</summary>
+	// Patrol: walk to the current waypoint; on arrival, sweep-look, then advance to the next.
+	private void PatrolStep()
+	{
+		if (Waypoints.Count == 0) { StandStill(); return; }
+		Vector3 target = Waypoints[_wp].GlobalPosition;
+		_agent.TargetPosition = target;
+		if (_agent.IsNavigationFinished())
+		{
+			StandStill();
+			if (Scan()) _wp = (_wp + 1) % Waypoints.Count;   // sweep done -> next waypoint (wraps around)
+		}
+		else
+		{
+			MoveTo(target, PatrolSpeed);
+		}
+	}
+
+	// Searching: travel to the last-seen spot, then look around while the meter decays toward giving up.
+	private void SearchStep()
+	{
+		_agent.TargetPosition = _lastSeenPos;
+		if (_agent.IsNavigationFinished())
+		{
+			StandStill();
+			Scan();   // keep sweeping; UpdatePerception's decay is what eventually returns us to Patrol
+		}
+		else
+		{
+			MoveTo(_lastSeenPos, SearchSpeed);
+		}
+	}
+
+	// Steers the guard toward a target across the navmesh, feeding a desired velocity to avoidance.
+	private void MoveTo(Vector3 targetPos, float speed)
+	{
+		_agent.TargetPosition = targetPos;
+		if (_agent.IsNavigationFinished())
+		{
+			StandStill();   // arrived: request stop (gravity is still applied in OnVelocityComputed)
+			return;
+		}
+		Vector3 dir = _agent.GetNextPathPosition() - GlobalPosition;  // toward the next point on the path
+		dir.Y = 0;                                                    // horizontal only; gravity handles vertical
+		dir = dir.Normalized();
+		FaceToward(GlobalPosition + dir);                             // face the travel direction
+		_agent.Velocity = dir * speed;                                // desired velocity -> triggers OnVelocityComputed
+	}
+
+	// Requests zero horizontal velocity. Still routed through the agent so gravity/MoveAndSlide
+	// happen in the callback even when the guard isn't actively walking (e.g. while scanning).
+	private void StandStill() => _agent.Velocity = Vector3.Zero;
+
+	// Applies the avoidance-adjusted (safe) velocity plus gravity, then moves. Fired by the agent's signal.
+	private void OnVelocityComputed(Vector3 safeVelocity)
+	{
+		Vector3 v = Velocity;
+		v.X = safeVelocity.X;                                  // avoidance-adjusted horizontal velocity
+		v.Z = safeVelocity.Z;
+		v.Y -= Gravity * (float)GetPhysicsProcessDeltaTime();  // keep the guard on the floor
+		Velocity = v;
+		MoveAndSlide();                                        // the ONE place we move (avoidance is on)
+	}
+
+	// Sweeps the guard's facing left/right around its arrival heading. Returns true after one full sweep.
+	private bool Scan()
+	{
+		if (_scanTimer == 0f) _baseYaw = Rotation.Y;    // center the sweep on the current facing
+		_scanTimer += (float)GetPhysicsProcessDeltaTime();
+		float phase = _scanTimer / ScanSeconds;          // 0 -> 1 over the sweep
+		// Sin over one full cycle gives a smooth right-then-left-then-back swing.
+		Rotation = new Vector3(0, _baseYaw + Mathf.Sin(phase * Mathf.Tau) * Mathf.DegToRad(ScanArcDeg), 0);
+		if (_scanTimer >= ScanSeconds) { _scanTimer = 0f; return true; }
+		return false;
+	}
+
+	// Yaws the guard to face a world position, staying upright (ignores height).
 	private void FaceToward(Vector3 worldPos)
 	{
 		worldPos.Y = GlobalPosition.Y;                        // level out so we only turn, not tilt
@@ -167,10 +245,9 @@ public partial class Guard : CharacterBody3D
 	//   tracking. Left per-frame for now: a single guard is cheap and per-frame gives the smoothest facing.
 	//   Refs: Godot ray-casting docs - https://docs.godotengine.org/en/stable/tutorials/physics/ray-casting.html
 	//         Stealth FOV guide (recommends a 0.1-0.2s Timer) - https://uhiyama-lab.com/en/notes/godot/stealth-fov-system/
-	/// <summary>
-	/// True if the player is currently visible: within range, inside the view cone, and with an
-	/// unobstructed line of sight - tested against several points on the player's body.
-	/// </summary>
+	//
+	// True if the player is currently visible: within range, inside the view cone, and with a clear
+	// line of sight - tested against several points on the player's body.
 	private bool CanSeePlayer()
 	{
 		if (_player == null) return false;
@@ -196,7 +273,7 @@ public partial class Guard : CharacterBody3D
 		return false;
 	}
 
-	/// <summary>Updates the debug cone color and the floating state/percent readout.</summary>
+	// Updates the debug cone color and the floating state/percent readout.
 	private void UpdateDebug()
 	{
 		Color c = StateColor();
@@ -205,7 +282,7 @@ public partial class Guard : CharacterBody3D
 		_label.Modulate = c;
 	}
 
-	/// <summary>Debug color per awareness state (green -> yellow -> orange -> red).</summary>
+	// Debug color per awareness state (green -> yellow -> orange -> red).
 	private Color StateColor() => _state switch
 	{
 		State.Patrol => new Color(0.2f, 1f, 0.05f),
@@ -215,11 +292,8 @@ public partial class Guard : CharacterBody3D
 		_ => Colors.White,
 	};
 
-	/// <summary>
-	/// Builds the translucent debug vision cone in code (so it never clutters the editor) and
-	/// sizes it from <see cref="ViewDistance"/> / <see cref="ViewAngleDeg"/> so it always matches
-	/// the detection math. Base radius = height * tan(half-angle).
-	/// </summary>
+	// Builds the translucent debug vision cone in code (so it never clutters the editor), sized from
+	// ViewDistance/ViewAngleDeg (base radius = height * tan(half-angle)) so it matches the detection math.
 	private void BuildVisionCone()
 	{
 		var mesh = new CylinderMesh
@@ -245,7 +319,7 @@ public partial class Guard : CharacterBody3D
 		_eyes.AddChild(_cone);
 	}
 
-	/// <summary>Builds the billboarded debug label that floats above the guard.</summary>
+	// Builds the billboarded debug label that floats above the guard.
 	private void BuildDebugLabel()
 	{
 		_label = new Label3D
@@ -258,7 +332,4 @@ public partial class Guard : CharacterBody3D
 		};
 		AddChild(_label);
 	}
-
-	/// <summary>Patrol behavior placeholder; navmesh movement is added in the navigation milestone.</summary>
-	private void Patrol() { }
 }
