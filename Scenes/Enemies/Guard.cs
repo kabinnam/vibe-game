@@ -5,9 +5,18 @@ using Godot;
 // meter; line of sight is verified by sampling several points on the player's body and
 // raycasting, so cover genuinely hides the player. The guard patrols a waypoint loop,
 // investigates, and chases using its NavigationAgent3D (with RVO avoidance).
+//
+// Organization note: this is one cohesive script for a single enemy type. If a second enemy
+// type appears, the "SEAM" comments below mark the natural pieces to extract into reusable
+// component nodes/scenes (Vision, Mover) or a node-based state machine.
 public partial class Guard : CharacterBody3D
 {
+	#region Configuration & fields
+
 	// Awareness levels, in escalating order.
+	// SEAM (state machine): if states grow numerous/complex, this enum + the transitions in
+	// UpdatePerception + the actions in ApplyBehavior could become a node-based StateMachine
+	// (one child node per state) instead of switch statements.
 	public enum State
 	{
 		Patrol,      // unaware; walking the waypoint loop
@@ -26,9 +35,9 @@ public partial class Guard : CharacterBody3D
 
 	// --- Movement tuning (Inspector-editable) ---
 	[Export] public float PatrolSpeed = 1.5f;      // walk speed on patrol (player is 5.0)
-	[Export] public float SuspiciousSpeed = 1f;  // creep speed while investigating
-	[Export] public float ChaseSpeed = 4.5f;       // pursuit speed (a hair faster than the player)
-	[Export] public float SearchSpeed = 3f;      // travel speed to the last-seen spot
+	[Export] public float SuspiciousSpeed = 1f;    // creep speed while investigating
+	[Export] public float ChaseSpeed = 3.5f;       // pursuit speed
+	[Export] public float SearchSpeed = 3f;        // travel speed to the last-seen spot
 
 	[Export] public Godot.Collections.Array<Marker3D> Waypoints = new();  // per-guard patrol route (order matters)
 	[Export] public float ScanArcDeg = 70f;    // how far left/right the "look around" sweep turns
@@ -59,6 +68,10 @@ public partial class Guard : CharacterBody3D
 	private StandardMaterial3D _coneMat; // debug cone material (recolored per state)
 	private Label3D _label;              // debug readout floating above the guard
 
+	#endregion
+
+	#region Lifecycle
+
 	// Runs once when the guard enters the scene tree (Godot lifecycle).
 	public override void _Ready()
 	{
@@ -67,11 +80,11 @@ public partial class Guard : CharacterBody3D
 		BuildVisionCone();
 		BuildDebugLabel();
 
+		// The agent's static avoidance settings (avoidance_enabled / radius / height) now live on
+		// the NavigationAgent3D node in Guard.tscn (scene = config). Here we only do the code-side
+		// wiring: a derived value and the signal hookup.
 		_agent = GetNode<NavigationAgent3D>("NavigationAgent3D");
-		_agent.AvoidanceEnabled = true;                 // steer around other agents (RVO)
-		_agent.Radius = 0.45f;                          // avoidance space the guard wants around itself
-		_agent.Height = 1.8f;
-		_agent.MaxSpeed = ChaseSpeed;                   // avoidance clamps to this; set to the fastest speed
+		_agent.MaxSpeed = ChaseSpeed;                   // derived from a tunable export, so kept in sync here
 		_agent.VelocityComputed += OnVelocityComputed;  // "here's your collision-safe velocity" signal
 	}
 
@@ -82,6 +95,13 @@ public partial class Guard : CharacterBody3D
 		ApplyBehavior();
 		UpdateDebug();
 	}
+
+	#endregion
+
+	#region Perception
+	// SEAM (Vision): when you add more enemy types, the perception here (the vision cone + the
+	// line-of-sight sampling in CanSeePlayer) is the natural piece to extract into a reusable
+	// Vision sensor node/scene that any NPC can attach.
 
 	// Advances the awareness meter and state machine. First detection ramps up gradually in
 	// Suspicious; only Searching re-locks instantly to Targeting on re-sight.
@@ -130,6 +150,51 @@ public partial class Guard : CharacterBody3D
 		float d = _eyes.GlobalPosition.DistanceTo(_player.GlobalPosition);
 		return Mathf.Clamp(1f - d / ViewDistance, 0.15f, 1f);
 	}
+
+	// TODO (perf - revisit when spawning many guards): throttle this vision check instead of
+	// running it every physics frame.
+	//   What: today _PhysicsProcess -> UpdatePerception calls CanSeePlayer() ~60x/sec, and each
+	//   call fires up to 3 raycasts (one per body sample) = ~180 server raycasts/sec PER guard.
+	//   Why: individually these server-side raycasts are cheap, but they add up fast with many
+	//   guards. The standard guidance is to run perception on a Timer at ~0.1-0.2s intervals.
+	//   How (so behavior stays identical): integrate the detection meter over the ACTUAL elapsed
+	//   interval (not the per-frame delta), and consider keeping FaceToward() per-frame for smooth
+	//   tracking. Left per-frame for now: a single guard is cheap and per-frame gives the smoothest facing.
+	//   Refs: Godot ray-casting docs - https://docs.godotengine.org/en/stable/tutorials/physics/ray-casting.html
+	//         Stealth FOV guide (recommends a 0.1-0.2s Timer) - https://uhiyama-lab.com/en/notes/godot/stealth-fov-system/
+	//
+	// True if the player is currently visible: within range, inside the view cone, and with a clear
+	// line of sight - tested against several points on the player's body.
+	private bool CanSeePlayer()
+	{
+		if (_player == null) return false;
+
+		var space = GetWorld3D().DirectSpaceState;    // physics world used for raycasts
+		Vector3 forward = -GlobalTransform.Basis.Z;   // guard's forward direction (Godot faces -Z)
+
+		foreach (Vector3 offset in SamplePoints)
+		{
+			Vector3 target = _player.GlobalPosition + offset;   // a point on the player's body
+			Vector3 toTarget = target - _eyes.GlobalPosition;   // eyes -> that point
+
+			if (toTarget.Length() > ViewDistance) continue;                          // 1. out of range
+			if (forward.AngleTo(toTarget) > Mathf.DegToRad(ViewAngleDeg)) continue;   // 2. outside FOV cone
+
+			// 3. Line of sight: cast a ray from the eyes to the point, ignoring our own body.
+			var q = PhysicsRayQueryParameters3D.Create(_eyes.GlobalPosition, target);
+			q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+			var hit = space.IntersectRay(q);
+			if (hit.Count > 0 && (Node)hit["collider"] == _player)
+				return true;   // this point is clearly visible -> the player is seen
+		}
+		return false;
+	}
+
+	#endregion
+
+	#region Movement
+	// SEAM (Mover): the navmesh steering here could become a reusable Mover node/scene shared by
+	// any NPC; ApplyBehavior/PatrolStep/SearchStep are the per-state actions half of the FSM seam.
 
 	// Picks a movement target + speed per state (or scans when arrived).
 	private void ApplyBehavior()
@@ -234,44 +299,9 @@ public partial class Guard : CharacterBody3D
 		LookAt(worldPos, Vector3.Up);
 	}
 
-	// TODO (perf - revisit when spawning many guards): throttle this vision check instead of
-	// running it every physics frame.
-	//   What: today _PhysicsProcess -> UpdatePerception calls CanSeePlayer() ~60x/sec, and each
-	//   call fires up to 3 raycasts (one per body sample) = ~180 server raycasts/sec PER guard.
-	//   Why: individually these server-side raycasts are cheap, but they add up fast with many
-	//   guards. The standard guidance is to run perception on a Timer at ~0.1-0.2s intervals.
-	//   How (so behavior stays identical): integrate the detection meter over the ACTUAL elapsed
-	//   interval (not the per-frame delta), and consider keeping FaceToward() per-frame for smooth
-	//   tracking. Left per-frame for now: a single guard is cheap and per-frame gives the smoothest facing.
-	//   Refs: Godot ray-casting docs - https://docs.godotengine.org/en/stable/tutorials/physics/ray-casting.html
-	//         Stealth FOV guide (recommends a 0.1-0.2s Timer) - https://uhiyama-lab.com/en/notes/godot/stealth-fov-system/
-	//
-	// True if the player is currently visible: within range, inside the view cone, and with a clear
-	// line of sight - tested against several points on the player's body.
-	private bool CanSeePlayer()
-	{
-		if (_player == null) return false;
+	#endregion
 
-		var space = GetWorld3D().DirectSpaceState;    // physics world used for raycasts
-		Vector3 forward = -GlobalTransform.Basis.Z;   // guard's forward direction (Godot faces -Z)
-
-		foreach (Vector3 offset in SamplePoints)
-		{
-			Vector3 target = _player.GlobalPosition + offset;   // a point on the player's body
-			Vector3 toTarget = target - _eyes.GlobalPosition;   // eyes -> that point
-
-			if (toTarget.Length() > ViewDistance) continue;                          // 1. out of range
-			if (forward.AngleTo(toTarget) > Mathf.DegToRad(ViewAngleDeg)) continue;   // 2. outside FOV cone
-
-			// 3. Line of sight: cast a ray from the eyes to the point, ignoring our own body.
-			var q = PhysicsRayQueryParameters3D.Create(_eyes.GlobalPosition, target);
-			q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-			var hit = space.IntersectRay(q);
-			if (hit.Count > 0 && (Node)hit["collider"] == _player)
-				return true;   // this point is clearly visible -> the player is seen
-		}
-		return false;
-	}
+	#region Debug visualization
 
 	// Updates the debug cone color and the floating state/percent readout.
 	private void UpdateDebug()
@@ -332,4 +362,6 @@ public partial class Guard : CharacterBody3D
 		};
 		AddChild(_label);
 	}
+
+	#endregion
 }

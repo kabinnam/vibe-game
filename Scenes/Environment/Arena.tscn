@@ -159,8 +159,8 @@ transform = Transform3D(0.006734982, 0, 0.99997735, 0, 1, 0, -0.99997735, 0, 0.0
 Waypoints = [NodePath("../Patrol_Ground/G1"), NodePath("../Patrol_Ground/G2"), NodePath("../Patrol_Ground/G3"), NodePath("../Patrol_Ground/G4"), NodePath("../Patrol_Ground/G5")]
 
 [node name="Guard2" parent="." unique_id=1977322746 node_paths=PackedStringArray("Waypoints") instance=ExtResource("8_0hfyg")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.338845, 4, 3.7142057)
-Waypoints = [NodePath("../Patrol_Mezzanine/M4"), NodePath("../Patrol_Mezzanine/M3"), NodePath("../Patrol_Mezzanine/M2"), NodePath("../Patrol_Mezzanine/M1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.41424, 4, 4.0981665)
+Waypoints = [NodePath("../Patrol_Mezzanine/M2"), NodePath("../Patrol_Mezzanine/M1"), NodePath("../Patrol_Mezzanine/M4"), NodePath("../Patrol_Mezzanine/M3")]
 
 [node name="Patrol_Ground" type="Node3D" parent="." unique_id=1113199717]
 
