@@ -43,6 +43,10 @@ public partial class Guard : CharacterBody3D
 	[Export] public float ScanArcDeg = 70f;    // how far left/right the "look around" sweep turns
 	[Export] public float ScanSeconds = 2.0f;  // how long one sweep lasts
 
+	// --- Search tuning (Inspector-editable) ---
+	[Export] public float SearchThreshold = 0.5f;  // suspicion above which losing sight triggers a search
+	[Export] public float SearchTimeout = 8f;       // give up searching after this many seconds (unreachable safety)
+
 	// Points sampled on the player's body (feet / torso / head). Seeing ANY one counts as
 	// "seen", so a player peeking over low cover is still detected.
 	private static readonly Vector3[] SamplePoints =
@@ -58,6 +62,7 @@ public partial class Guard : CharacterBody3D
 
 	private int _wp = 0;                 // index of the current patrol waypoint
 	private float _scanTimer = 0f;       // progress through the current look-around sweep
+	private float _searchTimer = 0f;     // time spent in the current search (drives the timeout)
 	private float _baseYaw;              // facing captured when a scan starts (sweep centers on it)
 	private const float Gravity = 9.8f;  // downward accel so the guard stays on the floor
 
@@ -103,8 +108,9 @@ public partial class Guard : CharacterBody3D
 	// line-of-sight sampling in CanSeePlayer) is the natural piece to extract into a reusable
 	// Vision sensor node/scene that any NPC can attach.
 
-	// Advances the awareness meter and state machine. First detection ramps up gradually in
-	// Suspicious; only Searching re-locks instantly to Targeting on re-sight.
+	// Advances the awareness meter and state machine. Detection ramps up gradually; the meter value
+	// is carried into Searching as "memory", so a re-sight resumes filling (effectively instant when
+	// the meter was still ~1, a quick ramp when it was only suspicious).
 	private void UpdatePerception(double delta)
 	{
 		bool seen = CanSeePlayer();
@@ -120,28 +126,54 @@ public partial class Guard : CharacterBody3D
 				break;
 
 			case State.Suspicious:
-				// Integrate the meter over time: rate (per second) * dt (seconds this frame).
-				// Fill (scaled by proximity) while seen, decay while not. No instant snap here.
-				_detection += (seen ? DetectRate * DistanceFactor() : -DecayRate) * dt;
-				if (_detection >= 1f) _state = State.Targeting;
-				else if (_detection <= 0f) _state = State.Patrol;
+				if (seen)
+				{
+					_detection += DetectRate * DistanceFactor() * dt;   // gradual first-contact ramp
+					if (_detection >= 1f) _state = State.Targeting;
+				}
+				else if (_detection > SearchThreshold)
+				{
+					EnterSearching();                                   // was pretty sure -> go investigate
+				}
+				else
+				{
+					_detection -= DecayRate * dt;                       // fleeting glimpse -> forget it
+					if (_detection <= 0f) _state = State.Patrol;
+				}
 				break;
 
 			case State.Targeting:
-				// Fully alerted; drops to Searching the moment line of sight is lost.
+				// Fully alerted; drops to a search the moment line of sight is lost.
 				_detection = 1f;
-				if (!seen) _state = State.Searching;
+				if (!seen) EnterSearching();
 				break;
 
 			case State.Searching:
-				// Cooldown after being spotted: re-seeing the player snaps straight back to
-				// Targeting; otherwise the meter decays until the guard gives up (-> Patrol).
-				if (seen) { _detection = 1f; _state = State.Targeting; }
-				else { _detection -= DecayRate * dt; if (_detection <= 0f) _state = State.Patrol; }
+				if (seen)
+				{
+					_detection += DetectRate * DistanceFactor() * dt;   // resume filling (instant when ~1)
+					if (_detection >= 1f) _state = State.Targeting;
+				}
+				else
+				{
+					_searchTimer += dt;
+					if (_agent.IsNavigationFinished())                  // only decay once we've reached the spot
+						_detection -= DecayRate * dt;
+					if (_detection <= 0f || _searchTimer >= SearchTimeout)
+						_state = State.Patrol;                          // give up: found nothing, or timed out
+				}
 				break;
 		}
 
 		_detection = Mathf.Clamp(_detection, 0f, 1f);   // keep within [0, 1]
+	}
+
+	// Enter the active search: keep the current meter value (memory) and reset the search timer.
+	// Called from both Suspicious (lost sight while > threshold) and Targeting (lost sight).
+	private void EnterSearching()
+	{
+		_state = State.Searching;
+		_searchTimer = 0f;
 	}
 
 	// Proximity multiplier for detection speed: 1 at the guard, down to a 0.15 floor at max range.
