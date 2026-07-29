@@ -1,3 +1,5 @@
+#nullable enable
+
 using Godot;
 
 public partial class PlayerController : CharacterBody3D
@@ -7,23 +9,36 @@ public partial class PlayerController : CharacterBody3D
     [Export] public float MouseSensitivity = 0.002f;
     [Export] public float Gravity = 9.8f;
 
-    private Node3D _head;
+    private PlayerAnimator? _animator;
+    private PlayerCameraRig? _cameraRig;
 
     public override void _Ready()
     {
-        _head = GetNode<Node3D>("Head");
+        _animator = GetNodeOrNull<PlayerAnimator>("PlayerAvatar");
+        _cameraRig = GetNodeOrNull<PlayerCameraRig>("PlayerCameraRig");
+
+        if (_animator == null)
+            GD.PushError("PlayerAvatar is missing; movement remains enabled.");
+
+        if (_cameraRig == null)
+            GD.PushError("PlayerCameraRig is missing; movement remains enabled.");
+
+        _animator?.SetFirstPerson(_cameraRig?.IsFirstPerson ?? true);
         Input.MouseMode = Input.MouseModeEnum.Captured;
     }
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event is InputEventMouseMotion mouseMotion)
+        if (@event is InputEventMouseMotion motion)
         {
-            RotateY(-mouseMotion.Relative.X * MouseSensitivity);
-            _head.RotateX(-mouseMotion.Relative.Y * MouseSensitivity);
-            var rot = _head.Rotation;
-            rot.X = Mathf.Clamp(rot.X, Mathf.DegToRad(-90f), Mathf.DegToRad(90f));
-            _head.Rotation = rot;
+            RotateY(-motion.Relative.X * MouseSensitivity);
+            _cameraRig?.AddPitch(-motion.Relative.Y * MouseSensitivity);
+        }
+
+        if (@event.IsActionPressed("toggle_camera"))
+        {
+            _cameraRig?.ToggleMode();
+            _animator?.SetFirstPerson(_cameraRig?.IsFirstPerson ?? true);
         }
 
         if (@event.IsActionPressed("ui_cancel"))
@@ -56,5 +71,14 @@ public partial class PlayerController : CharacterBody3D
 
         Velocity = velocity;
         MoveAndSlide();
+
+        var horizontalSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
+        var normalizedSpeed = Speed > 0f ? horizontalSpeed / Speed : 0f;
+        _animator?.Advance(
+            (float)delta,
+            normalizedSpeed,
+            IsOnFloor(),
+            Velocity.Y,
+            Input.IsActionPressed("smoke"));
     }
 }

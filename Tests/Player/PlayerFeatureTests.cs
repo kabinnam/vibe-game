@@ -14,6 +14,7 @@ public partial class PlayerFeatureTests : Node
             TestAvatarScene();
             TestAnimator();
             TestCameraRig();
+            TestPlayerIntegration();
             TestAnimatorPoseOutputs();
             GD.Print($"PASS PlayerFeatureTests ({_count} assertions)");
             GetTree().Quit(0);
@@ -145,6 +146,23 @@ public partial class PlayerFeatureTests : Node
             0.001f);
 
         rig.QueueFree();
+    }
+
+    private void TestPlayerIntegration()
+    {
+        True(InputMap.HasAction("toggle_camera"), "toggle camera input exists");
+        True(InputMap.HasAction("smoke"), "smoke input exists");
+        var player = GD.Load<PackedScene>("res://Scenes/Player/Player.tscn")
+            .Instantiate<CharacterBody3D>();
+        AddChild(player);
+        True(
+            player.GetNodeOrNull<PlayerAnimator>("PlayerAvatar") != null,
+            "player composes avatar");
+        True(
+            player.GetNodeOrNull<PlayerCameraRig>("PlayerCameraRig") != null,
+            "player composes cameras");
+        True(player.HasNode("CollisionShape3D"), "player keeps collision");
+        player.QueueFree();
     }
 
     private void TestAnimatorPoseOutputs()
