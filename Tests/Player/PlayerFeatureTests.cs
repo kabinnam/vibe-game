@@ -17,7 +17,9 @@ public partial class PlayerFeatureTests : Node
             TestCameraRig();
             await TestPlayerIntegration();
             await TestPlayerSpringArmAvoidsSelfCollision();
+            await TestPlayerSpringArmShortensForObstacle();
             TestFirstPersonSmokingClearance();
+            TestAnimatorDoesNotDrivePlayer();
             TestAnimatorPoseOutputs();
             GD.Print($"PASS PlayerFeatureTests ({_count} assertions)");
             GetTree().Quit(0);
@@ -48,6 +50,16 @@ public partial class PlayerFeatureTests : Node
         state.Advance(0.1f, 0f, true, false);
         Near(0f, state.SmokeBlend, "stopping smoking fades out at five units per second");
 
+        var releasingSmoke = new PlayerAnimationState();
+        releasingSmoke.Advance(0.2f, 0f, true, true);
+        Near(1f, releasingSmoke.SmokeBlend, "held smoke reaches full blend");
+        releasingSmoke.Advance(0.1f, 0f, true, false);
+        True(
+            releasingSmoke.SmokeBlend > 0f && releasingSmoke.SmokeBlend < 1f,
+            "released smoke passes through an intermediate blend");
+        releasingSmoke.Advance(0.1f, 0f, true, false);
+        Near(0f, releasingSmoke.SmokeBlend, "released smoke reaches zero after blending out");
+
         var clampedLowSpeed = new PlayerAnimationState();
         clampedLowSpeed.Advance(0.1f, -1f, true, false);
         Near(0f, clampedLowSpeed.NormalizedSpeed, "negative speed clamps to zero");
@@ -70,6 +82,11 @@ public partial class PlayerFeatureTests : Node
         True(packed != null, "avatar scene loads");
         var avatar = packed.Instantiate<Node3D>();
         AddChild(avatar);
+        Near(
+            Mathf.Pi,
+            Mathf.Abs(avatar.Rotation.Y),
+            "avatar faces controller-forward negative Z",
+            0.001f);
         var skeleton = avatar.GetNodeOrNull<Skeleton3D>("CharacterModel/Skeleton3D");
         True(skeleton != null, "avatar contains skeleton");
         True(skeleton.FindBone("Hand_R") >= 0, "right hand bone exists");
@@ -266,6 +283,39 @@ public partial class PlayerFeatureTests : Node
         player.QueueFree();
     }
 
+    private async Task TestPlayerSpringArmShortensForObstacle()
+    {
+        var obstacle = new StaticBody3D
+        {
+            Position = new Vector3(200f, 1.6f, 1.6f)
+        };
+        var obstacleShape = new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(2f, 2f, 0.2f) }
+        };
+        obstacle.AddChild(obstacleShape);
+        AddChild(obstacle);
+
+        var player = GD.Load<PackedScene>("res://Scenes/Player/Player.tscn")
+            .Instantiate<CharacterBody3D>();
+        player.Position = new Vector3(200f, 0f, 0f);
+        AddChild(player);
+        player.GetNode<PlayerCameraRig>("PlayerCameraRig").ToggleMode();
+        var springArm = player.GetNode<SpringArm3D>(
+            "PlayerCameraRig/ThirdPersonSpringArm");
+
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+        var hitLength = springArm.GetHitLength();
+        True(hitLength > 0f, $"obstacle leaves a positive camera distance (got {hitLength})");
+        True(
+            hitLength < springArm.SpringLength,
+            $"obstacle shortens camera below {springArm.SpringLength} (got {hitLength})");
+        player.QueueFree();
+        obstacle.QueueFree();
+    }
+
     private void TestFirstPersonSmokingClearance()
     {
         var player = GD.Load<PackedScene>("res://Scenes/Player/Player.tscn")
@@ -276,12 +326,43 @@ public partial class PlayerFeatureTests : Node
         var skeleton = animator.GetNode<Skeleton3D>("CharacterModel/Skeleton3D");
         var handPose = skeleton.GetBoneGlobalPose(skeleton.FindBone("Hand_R"));
         var handPosition = skeleton.GlobalTransform * handPose.Origin;
+        var headPose = skeleton.GetBoneGlobalPose(skeleton.FindBone("Head"));
+        var headPosition = skeleton.GlobalTransform * headPose.Origin;
         var cameraPosition = player.GetNode<Camera3D>(
             "PlayerCameraRig/FirstPersonCamera").GlobalPosition;
+        True(
+            cameraPosition.Y - headPosition.Y >= 0.08f,
+            "first-person camera sits above the hidden head for downward visibility");
         var clearance = cameraPosition.DistanceTo(handPosition);
         True(
             clearance >= 0.38f,
             $"first-person smoking hand clears the camera by 0.38 (got {clearance})");
+        player.QueueFree();
+    }
+
+    private void TestAnimatorDoesNotDrivePlayer()
+    {
+        var player = GD.Load<PackedScene>("res://Scenes/Player/Player.tscn")
+            .Instantiate<PlayerController>();
+        player.Position = new Vector3(50f, 2f, -3f);
+        player.Velocity = new Vector3(1f, 2f, 3f);
+        AddChild(player);
+        var positionBefore = player.Position;
+        var velocityBefore = player.Velocity;
+
+        player.GetNode<PlayerAnimator>("PlayerAvatar")
+            .Advance(0.1f, 0f, false, player.Velocity.Y, false);
+
+        VectorNear(
+            positionBefore,
+            player.Position,
+            "airborne animation does not change player position",
+            0f);
+        VectorNear(
+            velocityBefore,
+            player.Velocity,
+            "airborne animation does not change controller velocity",
+            0f);
         player.QueueFree();
     }
 
@@ -359,7 +440,7 @@ public partial class PlayerFeatureTests : Node
         layeredAnimator.Advance(0.2f, 1f, true, 0f, true);
         var smokingOnlyShoulder = shoulderBaseline
             * Quaternion.FromEuler(new Vector3(0f, 0f, -1.15f))
-            * Quaternion.FromEuler(new Vector3(-0.65f, -0.20f, 1.60f));
+            * Quaternion.FromEuler(new Vector3(-0.65f, -0.44f, 1.60f));
         QuaternionNear(
             smokingOnlyShoulder,
             layeredSkeleton.GetBonePoseRotation(shoulder),

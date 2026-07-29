@@ -191,7 +191,7 @@ public partial class PlayerAnimator : Node3D
 
     private void ApplySmoking(float blend)
     {
-        Rotate(BoneSlot.ShoulderR, new Vector3(-0.65f, -0.20f, 1.60f) * blend);
+        Rotate(BoneSlot.ShoulderR, new Vector3(-0.65f, -0.44f, 1.60f) * blend);
         Rotate(BoneSlot.ElbowR, new Vector3(0f, 0f, 2.20f) * blend);
         Rotate(BoneSlot.HandR, new Vector3(0.12f, 0.30f, -0.18f) * blend);
     }

@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://Scenes/Player/PlayerAnimator.cs" id="4"]
 
 [node name="PlayerAvatar" type="Node3D"]
+rotation = Vector3(0, 3.1415927, 0)
 script = ExtResource("4")
 
 [node name="CharacterModel" parent="." instance=ExtResource("1")]
