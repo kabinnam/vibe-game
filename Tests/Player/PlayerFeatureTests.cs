@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Godot;
 
 public partial class PlayerFeatureTests : Node
 {
     private int _count;
 
-    public override void _Ready()
+    public override async void _Ready()
     {
         try
         {
@@ -14,7 +15,8 @@ public partial class PlayerFeatureTests : Node
             TestAvatarScene();
             TestAnimator();
             TestCameraRig();
-            TestPlayerIntegration();
+            await TestPlayerIntegration();
+            await TestPlayerSpringArmAvoidsSelfCollision();
             TestAnimatorPoseOutputs();
             GD.Print($"PASS PlayerFeatureTests ({_count} assertions)");
             GetTree().Quit(0);
@@ -148,13 +150,24 @@ public partial class PlayerFeatureTests : Node
         rig.QueueFree();
     }
 
-    private void TestPlayerIntegration()
+    private async Task TestPlayerIntegration()
     {
         True(InputMap.HasAction("toggle_camera"), "toggle camera input exists");
         True(InputMap.HasAction("smoke"), "smoke input exists");
+        True(
+            ActionHasPhysicalKey("toggle_camera", Key.V),
+            "toggle camera input uses physical V");
+        True(ActionHasPhysicalKey("smoke", Key.F), "smoke input uses physical F");
+
         var player = GD.Load<PackedScene>("res://Scenes/Player/Player.tscn")
-            .Instantiate<CharacterBody3D>();
+            .Instantiate<PlayerController>();
+        var animator = player.GetNode<PlayerAnimator>("PlayerAvatar");
+        var cameraRig = player.GetNode<PlayerCameraRig>("PlayerCameraRig");
+        var skeleton = animator.GetNode<Skeleton3D>("CharacterModel/Skeleton3D");
+        var head = skeleton.FindBone("Head");
+        var visibleHeadScale = skeleton.GetBonePoseScale(head);
         AddChild(player);
+
         True(
             player.GetNodeOrNull<PlayerAnimator>("PlayerAvatar") != null,
             "player composes avatar");
@@ -162,6 +175,93 @@ public partial class PlayerFeatureTests : Node
             player.GetNodeOrNull<PlayerCameraRig>("PlayerCameraRig") != null,
             "player composes cameras");
         True(player.HasNode("CollisionShape3D"), "player keeps collision");
+
+        var toggleCamera = new InputEventAction
+        {
+            Action = "toggle_camera",
+            Pressed = true
+        };
+        player._UnhandledInput(toggleCamera);
+        True(
+            cameraRig.GetNode<Camera3D>("ThirdPersonSpringArm/ThirdPersonCamera").Current,
+            "toggle input activates third-person camera");
+        VectorNear(
+            visibleHeadScale,
+            skeleton.GetBonePoseScale(head),
+            "toggle input restores exact third-person head scale",
+            0f);
+
+        player._UnhandledInput(toggleCamera);
+        True(
+            cameraRig.GetNode<Camera3D>("FirstPersonCamera").Current,
+            "second toggle input activates first-person camera");
+        VectorNear(
+            Vector3.One * 0.001f,
+            skeleton.GetBonePoseScale(head),
+            "second toggle input hides the head again",
+            0f);
+
+        var playerRotationBeforeMouse = player.Rotation;
+        var cameraRotationBeforeMouse = cameraRig.Rotation;
+        var mouseMotion = new InputEventMouseMotion
+        {
+            Relative = new Vector2(12f, -8f)
+        };
+        player._UnhandledInput(mouseMotion);
+        Near(
+            playerRotationBeforeMouse.Y - (12f * player.MouseSensitivity),
+            player.Rotation.Y,
+            "positive mouse X yaws the player negatively");
+        Near(
+            playerRotationBeforeMouse.X,
+            player.Rotation.X,
+            "mouse pitch does not rotate the player root");
+        Near(
+            cameraRotationBeforeMouse.X + (8f * player.MouseSensitivity),
+            cameraRig.Pitch,
+            "negative mouse Y pitches the camera rig positively");
+        Near(
+            cameraRotationBeforeMouse.Y,
+            cameraRig.Rotation.Y,
+            "mouse yaw does not rotate the camera rig");
+
+        var smokeBlendBefore = animator.State.SmokeBlend;
+        Input.ActionPress("smoke");
+        try
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            True(
+                animator.State.SmokeBlend > smokeBlendBefore,
+                "controller forwards held smoke input to animator");
+        }
+        finally
+        {
+            Input.ActionRelease("smoke");
+        }
+
+        player.QueueFree();
+    }
+
+    private async Task TestPlayerSpringArmAvoidsSelfCollision()
+    {
+        var player = GD.Load<PackedScene>("res://Scenes/Player/Player.tscn")
+            .Instantiate<CharacterBody3D>();
+        player.Position = new Vector3(100f, 0f, 0f);
+        AddChild(player);
+        player.GetNode<PlayerCameraRig>("PlayerCameraRig").ToggleMode();
+        var springArm = player.GetNode<SpringArm3D>(
+            "PlayerCameraRig/ThirdPersonSpringArm");
+        springArm.Position = new Vector3(0f, -0.7f, -0.5f);
+
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+        Near(
+            springArm.SpringLength,
+            springArm.GetHitLength(),
+            "integrated spring arm ignores the player capsule",
+            0.001f);
         player.QueueFree();
     }
 
@@ -255,6 +355,17 @@ public partial class PlayerFeatureTests : Node
             .Instantiate<PlayerAnimator>();
         AddChild(animator);
         return (animator, animator.GetNode<Skeleton3D>("CharacterModel/Skeleton3D"));
+    }
+
+    private static bool ActionHasPhysicalKey(StringName action, Key physicalKey)
+    {
+        foreach (var @event in InputMap.ActionGetEvents(action))
+        {
+            if (@event is InputEventKey keyEvent && keyEvent.PhysicalKeycode == physicalKey)
+                return true;
+        }
+
+        return false;
     }
 
     private void True(bool condition, string context)
