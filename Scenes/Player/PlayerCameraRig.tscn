@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scenes/Player/PlayerCameraRig.cs" id="1_camera_rig"]
+
+[node name="PlayerCameraRig" type="Node3D"]
+position = Vector3(0, 1.6, 0)
+script = ExtResource("1_camera_rig")
+
+[node name="FirstPersonCamera" type="Camera3D" parent="."]
+current = true
+near = 0.03
+
+[node name="ThirdPersonSpringArm" type="SpringArm3D" parent="."]
+spring_length = 3.2
+margin = 0.15
+collision_mask = 1
+
+[node name="ThirdPersonCamera" type="Camera3D" parent="ThirdPersonSpringArm"]
+near = 0.08

@@ -13,6 +13,7 @@ public partial class PlayerFeatureTests : Node
             TestAnimationState();
             TestAvatarScene();
             TestAnimator();
+            TestCameraRig();
             TestAnimatorPoseOutputs();
             GD.Print($"PASS PlayerFeatureTests ({_count} assertions)");
             GetTree().Quit(0);
@@ -110,6 +111,40 @@ public partial class PlayerFeatureTests : Node
             "third person restores head",
             0.001f);
         avatar.QueueFree();
+    }
+
+    private void TestCameraRig()
+    {
+        var rig = GD.Load<PackedScene>("res://Scenes/Player/PlayerCameraRig.tscn")
+            .Instantiate<PlayerCameraRig>();
+        AddChild(rig);
+
+        True(rig.IsFirstPerson, "camera rig starts in first person");
+        True(
+            rig.GetNode<Camera3D>("FirstPersonCamera").Current,
+            "first-person camera starts current");
+
+        rig.ToggleMode();
+        True(!rig.IsFirstPerson, "camera rig toggles to third person");
+        True(
+            rig.GetNode<Camera3D>("ThirdPersonSpringArm/ThirdPersonCamera").Current,
+            "third-person camera becomes current");
+
+        rig.AddPitch(10f);
+        Near(
+            Mathf.DegToRad(85f),
+            rig.Pitch,
+            "camera pitch clamps at positive 85 degrees",
+            0.001f);
+
+        rig.AddPitch(-20f);
+        Near(
+            Mathf.DegToRad(-85f),
+            rig.Pitch,
+            "camera pitch clamps at negative 85 degrees",
+            0.001f);
+
+        rig.QueueFree();
     }
 
     private void TestAnimatorPoseOutputs()
