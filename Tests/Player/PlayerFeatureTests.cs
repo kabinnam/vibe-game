@@ -12,6 +12,7 @@ public partial class PlayerFeatureTests : Node
         {
             TestAnimationState();
             TestAvatarScene();
+            TestAnimator();
             GD.Print($"PASS PlayerFeatureTests ({_count} assertions)");
             GetTree().Quit(0);
         }
@@ -84,6 +85,29 @@ public partial class PlayerFeatureTests : Node
         True(
             propMouthpiece?.Mesh is CylinderMesh { Material: not null },
             "prop mouthpiece cylinder has an intentional material");
+        avatar.QueueFree();
+    }
+
+    private void TestAnimator()
+    {
+        var avatar = GD.Load<PackedScene>("res://Scenes/Player/PlayerAvatar.tscn").Instantiate<Node3D>();
+        AddChild(avatar);
+        var animator = avatar as PlayerAnimator;
+        True(animator != null && animator.IsRigReady, "animator resolves rig");
+        animator.Advance(0.1f, 1.0f, true, 0.0f, true);
+        Equal(PlayerLocomotionMode.Walk, animator.State.LocomotionMode, "animator receives walk");
+        True(animator.State.SmokeBlend > 0.0f, "animator receives smoke");
+        var skeleton = avatar.GetNode<Skeleton3D>("CharacterModel/Skeleton3D");
+        var head = skeleton.FindBone("Head");
+        var visible = skeleton.GetBonePoseScale(head).Length();
+        animator.SetFirstPerson(true);
+        True(skeleton.GetBonePoseScale(head).Length() < visible, "first person hides head");
+        animator.SetFirstPerson(false);
+        Near(
+            visible,
+            skeleton.GetBonePoseScale(head).Length(),
+            "third person restores head",
+            0.001f);
         avatar.QueueFree();
     }
 
