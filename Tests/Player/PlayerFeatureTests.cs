@@ -13,6 +13,7 @@ public partial class PlayerFeatureTests : Node
             TestAnimationState();
             TestAvatarScene();
             TestAnimator();
+            TestAnimatorPoseOutputs();
             GD.Print($"PASS PlayerFeatureTests ({_count} assertions)");
             GetTree().Quit(0);
         }
@@ -111,6 +112,98 @@ public partial class PlayerFeatureTests : Node
         avatar.QueueFree();
     }
 
+    private void TestAnimatorPoseOutputs()
+    {
+        var (idleAnimator, idleSkeleton) = CreateAnimator();
+        var spine = idleSkeleton.FindBone("Spine_02");
+        var idleSpineBaseline = idleSkeleton.GetBonePoseRotation(spine);
+        idleAnimator.Advance(0.1f, 0f, true, 0f, false);
+        QuaternionChanged(
+            idleSpineBaseline,
+            idleSkeleton.GetBonePoseRotation(spine),
+            "idle animates Spine_02");
+        idleAnimator.QueueFree();
+
+        var (walkAnimator, walkSkeleton) = CreateAnimator();
+        var upperLeg = walkSkeleton.FindBone("UpperLeg_L");
+        var walkLegBaseline = walkSkeleton.GetBonePoseRotation(upperLeg);
+        walkAnimator.Advance(0.1f, 1f, true, 0f, false);
+        QuaternionChanged(
+            walkLegBaseline,
+            walkSkeleton.GetBonePoseRotation(upperLeg),
+            "walk animates UpperLeg_L");
+        walkAnimator.QueueFree();
+
+        var (airborneAnimator, airborneSkeleton) = CreateAnimator();
+        var hips = airborneSkeleton.FindBone("Hips");
+        var airborneHipsBaseline = airborneSkeleton.GetBonePoseRotation(hips);
+        airborneAnimator.Advance(0.1f, 0f, false, 1f, false);
+        QuaternionChanged(
+            airborneHipsBaseline,
+            airborneSkeleton.GetBonePoseRotation(hips),
+            "airborne animates Hips");
+        airborneAnimator.QueueFree();
+
+        var (smokeAnimator, smokeSkeleton) = CreateAnimator();
+        var elbow = smokeSkeleton.FindBone("Elbow_R");
+        var smokeElbowBaseline = smokeSkeleton.GetBonePoseRotation(elbow);
+        smokeAnimator.Advance(0.2f, 0f, true, 0f, true);
+        QuaternionChanged(
+            smokeElbowBaseline,
+            smokeSkeleton.GetBonePoseRotation(elbow),
+            "smoking animates Elbow_R");
+        smokeAnimator.QueueFree();
+
+        var (layeredAnimator, layeredSkeleton) = CreateAnimator();
+        var shoulder = layeredSkeleton.FindBone("Shoulder_R");
+        var shoulderBaseline = layeredSkeleton.GetBonePoseRotation(shoulder);
+        layeredAnimator.Advance(0.2f, 1f, true, 0f, true);
+        var smokingOnlyShoulder = shoulderBaseline * Quaternion.FromEuler(
+            new Vector3(-0.65f, -0.20f, -0.35f));
+        QuaternionNear(
+            smokingOnlyShoulder,
+            layeredSkeleton.GetBonePoseRotation(shoulder),
+            "full smoke overrides walking right shoulder",
+            0.001f);
+        layeredAnimator.QueueFree();
+
+        var (stableAnimator, stableSkeleton) = CreateAnimator();
+        var stableLeg = stableSkeleton.FindBone("UpperLeg_L");
+        stableAnimator.Advance(0.1f, 0.8f, true, 0f, false);
+        var firstPose = stableSkeleton.GetBonePoseRotation(stableLeg);
+        stableAnimator.Advance(0f, 0.8f, true, 0f, false);
+        QuaternionNear(
+            firstPose,
+            stableSkeleton.GetBonePoseRotation(stableLeg),
+            "repeated animator advances do not accumulate drift");
+        stableAnimator.QueueFree();
+
+        var (headAnimator, headSkeleton) = CreateAnimator();
+        var head = headSkeleton.FindBone("Head");
+        var headBaseline = headSkeleton.GetBonePoseScale(head);
+        headAnimator.SetFirstPerson(true);
+        headAnimator.Advance(0.1f, 1f, true, 0f, false);
+        VectorNear(
+            Vector3.One * 0.001f,
+            headSkeleton.GetBonePoseScale(head),
+            "first-person head remains hidden across Advance");
+        headAnimator.SetFirstPerson(false);
+        VectorNear(
+            headBaseline,
+            headSkeleton.GetBonePoseScale(head),
+            "third-person restores the full head scale vector",
+            0f);
+        headAnimator.QueueFree();
+    }
+
+    private (PlayerAnimator Animator, Skeleton3D Skeleton) CreateAnimator()
+    {
+        var animator = GD.Load<PackedScene>("res://Scenes/Player/PlayerAvatar.tscn")
+            .Instantiate<PlayerAnimator>();
+        AddChild(animator);
+        return (animator, animator.GetNode<Skeleton3D>("CharacterModel/Skeleton3D"));
+    }
+
     private void True(bool condition, string context)
     {
         _count++;
@@ -133,5 +226,50 @@ public partial class PlayerFeatureTests : Node
 
         if (MathF.Abs(expected - actual) > tolerance)
             throw new InvalidOperationException($"{context}: Expected {expected} +/- {tolerance}, got {actual}.");
+    }
+
+    private void QuaternionChanged(
+        Quaternion baseline,
+        Quaternion actual,
+        string context,
+        float tolerance = 0.0001f)
+    {
+        _count++;
+        var angle = baseline.AngleTo(actual);
+        if (!float.IsFinite(angle) || angle <= tolerance)
+        {
+            throw new InvalidOperationException(
+                $"{context}: Expected an angular change greater than {tolerance}, got {angle}.");
+        }
+    }
+
+    private void QuaternionNear(
+        Quaternion expected,
+        Quaternion actual,
+        string context,
+        float tolerance = 0.0001f)
+    {
+        _count++;
+        var angle = expected.AngleTo(actual);
+        if (!float.IsFinite(angle) || angle > tolerance)
+        {
+            throw new InvalidOperationException(
+                $"{context}: Expected angular difference <= {tolerance}, got {angle}.");
+        }
+    }
+
+    private void VectorNear(
+        Vector3 expected,
+        Vector3 actual,
+        string context,
+        float tolerance = 0.0001f)
+    {
+        _count++;
+        var distance = expected.DistanceTo(actual);
+        if (!float.IsFinite(distance) || distance > tolerance)
+        {
+            throw new InvalidOperationException(
+                $"{context}: Expected {expected} within {tolerance}, got {actual}.");
+        }
     }
 }
