@@ -1,0 +1,28 @@
+[gd_scene load_steps=4 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat"]
+albedo_color = Color(0.08, 0.1, 0.12, 1)
+metallic = 0.65
+roughness = 0.28
+
+[sub_resource type="CylinderMesh" id="Body"]
+material = SubResource("Mat")
+top_radius = 0.018
+bottom_radius = 0.022
+height = 0.16
+radial_segments = 10
+
+[sub_resource type="CylinderMesh" id="Tip"]
+top_radius = 0.011
+bottom_radius = 0.018
+height = 0.04
+radial_segments = 10
+
+[node name="SmokingProp" type="Node3D"]
+
+[node name="Body" type="MeshInstance3D" parent="."]
+mesh = SubResource("Body")
+
+[node name="Mouthpiece" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.1, 0)
+mesh = SubResource("Tip")

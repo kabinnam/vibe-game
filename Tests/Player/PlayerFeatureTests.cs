@@ -11,6 +11,7 @@ public partial class PlayerFeatureTests : Node
         try
         {
             TestAnimationState();
+            TestAvatarScene();
             GD.Print($"PASS PlayerFeatureTests ({_count} assertions)");
             GetTree().Quit(0);
         }
@@ -54,6 +55,29 @@ public partial class PlayerFeatureTests : Node
         True(
             wrappedPhase.CyclePhase >= 0f && wrappedPhase.CyclePhase < MathF.Tau,
             "large positive deltas keep cycle phase within one turn");
+    }
+
+    private void TestAvatarScene()
+    {
+        var packed = GD.Load<PackedScene>("res://Scenes/Player/PlayerAvatar.tscn");
+        True(packed != null, "avatar scene loads");
+        var avatar = packed.Instantiate<Node3D>();
+        AddChild(avatar);
+        var skeleton = avatar.GetNodeOrNull<Skeleton3D>("CharacterModel/Skeleton3D");
+        True(skeleton != null, "avatar contains skeleton");
+        True(skeleton.FindBone("Hand_R") >= 0, "right hand bone exists");
+        True(skeleton.FindBone("Head") >= 0, "head bone exists");
+        True(
+            avatar.GetNode<MeshInstance3D>("CharacterModel/Skeleton3D/SM_Character_Male_01").Visible,
+            "male is visible");
+        True(
+            !avatar.GetNode<MeshInstance3D>("CharacterModel/Skeleton3D/SM_Character_Female_01").Visible,
+            "female is hidden");
+        var attachment = avatar.GetNode<BoneAttachment3D>(
+            "CharacterModel/Skeleton3D/RightHandAttachment");
+        Equal("Hand_R", attachment.BoneName, "prop targets right hand");
+        True(attachment.HasNode("SmokingProp"), "prop is attached");
+        avatar.QueueFree();
     }
 
     private void True(bool condition, string context)
