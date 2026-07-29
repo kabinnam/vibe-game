@@ -77,6 +77,13 @@ public partial class PlayerFeatureTests : Node
             "CharacterModel/Skeleton3D/RightHandAttachment");
         Equal("Hand_R", attachment.BoneName, "prop targets right hand");
         True(attachment.HasNode("SmokingProp"), "prop is attached");
+        var propBody = attachment.GetNodeOrNull<MeshInstance3D>("SmokingProp/Body");
+        True(propBody?.Mesh is CylinderMesh, "prop body uses a cylinder mesh");
+        var propMouthpiece = attachment.GetNodeOrNull<MeshInstance3D>("SmokingProp/Mouthpiece");
+        True(propMouthpiece?.Mesh is CylinderMesh, "prop mouthpiece uses a cylinder mesh");
+        True(
+            propMouthpiece?.Mesh is CylinderMesh { Material: not null },
+            "prop mouthpiece cylinder has an intentional material");
         avatar.QueueFree();
     }
 

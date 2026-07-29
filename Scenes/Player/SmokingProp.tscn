@@ -13,6 +13,7 @@ height = 0.16
 radial_segments = 10
 
 [sub_resource type="CylinderMesh" id="Tip"]
+material = SubResource("Mat")
 top_radius = 0.011
 bottom_radius = 0.018
 height = 0.04
