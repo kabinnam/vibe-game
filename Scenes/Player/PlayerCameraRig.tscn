@@ -7,6 +7,7 @@ position = Vector3(0, 1.6, 0)
 script = ExtResource("1_camera_rig")
 
 [node name="FirstPersonCamera" type="Camera3D" parent="."]
+position = Vector3(0.08, 0, 0.08)
 current = true
 near = 0.03
 

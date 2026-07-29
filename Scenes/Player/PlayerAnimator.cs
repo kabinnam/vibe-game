@@ -2,6 +2,8 @@ using Godot;
 
 public partial class PlayerAnimator : Node3D
 {
+    private const float ShoulderRestAngle = 1.15f;
+
     private enum BoneSlot
     {
         Hips,
@@ -82,6 +84,7 @@ public partial class PlayerAnimator : Node3D
 
         State.Advance(delta, speed, grounded, smoking);
         ResetPose();
+        ApplyArmRest();
 
         if (State.LocomotionMode == PlayerLocomotionMode.Idle)
             ApplyIdle();
@@ -146,6 +149,12 @@ public partial class PlayerAnimator : Node3D
         Rotate(BoneSlot.ShoulderR, new Vector3(0f, 0f, -breath * 0.35f * freeRightArm));
     }
 
+    private void ApplyArmRest()
+    {
+        Rotate(BoneSlot.ShoulderL, new Vector3(0f, 0f, -ShoulderRestAngle));
+        Rotate(BoneSlot.ShoulderR, new Vector3(0f, 0f, -ShoulderRestAngle));
+    }
+
     private void ApplyWalk()
     {
         var amplitude = Mathf.Lerp(0.15f, 0.72f, State.NormalizedSpeed);
@@ -182,8 +191,8 @@ public partial class PlayerAnimator : Node3D
 
     private void ApplySmoking(float blend)
     {
-        Rotate(BoneSlot.ShoulderR, new Vector3(-0.65f, -0.20f, -0.35f) * blend);
-        Rotate(BoneSlot.ElbowR, new Vector3(-1.45f, 0.10f, 0.12f) * blend);
+        Rotate(BoneSlot.ShoulderR, new Vector3(-0.65f, -0.20f, 1.60f) * blend);
+        Rotate(BoneSlot.ElbowR, new Vector3(0f, 0f, 2.20f) * blend);
         Rotate(BoneSlot.HandR, new Vector3(0.12f, 0.30f, -0.18f) * blend);
     }
 

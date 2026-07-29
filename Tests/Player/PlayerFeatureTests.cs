@@ -17,6 +17,7 @@ public partial class PlayerFeatureTests : Node
             TestCameraRig();
             await TestPlayerIntegration();
             await TestPlayerSpringArmAvoidsSelfCollision();
+            TestFirstPersonSmokingClearance();
             TestAnimatorPoseOutputs();
             GD.Print($"PASS PlayerFeatureTests ({_count} assertions)");
             GetTree().Quit(0);
@@ -265,8 +266,53 @@ public partial class PlayerFeatureTests : Node
         player.QueueFree();
     }
 
+    private void TestFirstPersonSmokingClearance()
+    {
+        var player = GD.Load<PackedScene>("res://Scenes/Player/Player.tscn")
+            .Instantiate<PlayerController>();
+        AddChild(player);
+        var animator = player.GetNode<PlayerAnimator>("PlayerAvatar");
+        animator.Advance(0.2f, 0f, true, 0f, true);
+        var skeleton = animator.GetNode<Skeleton3D>("CharacterModel/Skeleton3D");
+        var handPose = skeleton.GetBoneGlobalPose(skeleton.FindBone("Hand_R"));
+        var handPosition = skeleton.GlobalTransform * handPose.Origin;
+        var cameraPosition = player.GetNode<Camera3D>(
+            "PlayerCameraRig/FirstPersonCamera").GlobalPosition;
+        var clearance = cameraPosition.DistanceTo(handPosition);
+        True(
+            clearance >= 0.38f,
+            $"first-person smoking hand clears the camera by 0.38 (got {clearance})");
+        player.QueueFree();
+    }
+
     private void TestAnimatorPoseOutputs()
     {
+        var (restAnimator, restSkeleton) = CreateAnimator();
+        restAnimator.Advance(0.1f, 0f, true, 0f, false);
+        BoneBelow(
+            restSkeleton,
+            "Shoulder_L",
+            "Hand_L",
+            0.25f,
+            "idle left hand rests below its shoulder");
+        BoneBelow(
+            restSkeleton,
+            "Shoulder_R",
+            "Hand_R",
+            0.25f,
+            "idle right hand rests below its shoulder");
+        restAnimator.QueueFree();
+
+        var (mouthAnimator, mouthSkeleton) = CreateAnimator();
+        mouthAnimator.Advance(0.2f, 0f, true, 0f, true);
+        BonesNear(
+            mouthSkeleton,
+            "Head",
+            "Hand_R",
+            0.35f,
+            "smoking raises the right hand to the head");
+        mouthAnimator.QueueFree();
+
         var (idleAnimator, idleSkeleton) = CreateAnimator();
         var spine = idleSkeleton.FindBone("Spine_02");
         var idleSpineBaseline = idleSkeleton.GetBonePoseRotation(spine);
@@ -311,8 +357,9 @@ public partial class PlayerFeatureTests : Node
         var shoulder = layeredSkeleton.FindBone("Shoulder_R");
         var shoulderBaseline = layeredSkeleton.GetBonePoseRotation(shoulder);
         layeredAnimator.Advance(0.2f, 1f, true, 0f, true);
-        var smokingOnlyShoulder = shoulderBaseline * Quaternion.FromEuler(
-            new Vector3(-0.65f, -0.20f, -0.35f));
+        var smokingOnlyShoulder = shoulderBaseline
+            * Quaternion.FromEuler(new Vector3(0f, 0f, -1.15f))
+            * Quaternion.FromEuler(new Vector3(-0.65f, -0.20f, 1.60f));
         QuaternionNear(
             smokingOnlyShoulder,
             layeredSkeleton.GetBonePoseRotation(shoulder),
@@ -434,6 +481,42 @@ public partial class PlayerFeatureTests : Node
         {
             throw new InvalidOperationException(
                 $"{context}: Expected {expected} within {tolerance}, got {actual}.");
+        }
+    }
+
+    private void BoneBelow(
+        Skeleton3D skeleton,
+        StringName upperBone,
+        StringName lowerBone,
+        float minimumDrop,
+        string context)
+    {
+        _count++;
+        var upper = skeleton.GetBoneGlobalPose(skeleton.FindBone(upperBone)).Origin;
+        var lower = skeleton.GetBoneGlobalPose(skeleton.FindBone(lowerBone)).Origin;
+        var drop = upper.Y - lower.Y;
+        if (!float.IsFinite(drop) || drop < minimumDrop)
+        {
+            throw new InvalidOperationException(
+                $"{context}: Expected a drop of at least {minimumDrop}, got {drop}.");
+        }
+    }
+
+    private void BonesNear(
+        Skeleton3D skeleton,
+        StringName firstBone,
+        StringName secondBone,
+        float maximumDistance,
+        string context)
+    {
+        _count++;
+        var first = skeleton.GetBoneGlobalPose(skeleton.FindBone(firstBone)).Origin;
+        var second = skeleton.GetBoneGlobalPose(skeleton.FindBone(secondBone)).Origin;
+        var distance = first.DistanceTo(second);
+        if (!float.IsFinite(distance) || distance > maximumDistance)
+        {
+            throw new InvalidOperationException(
+                $"{context}: Expected distance <= {maximumDistance}, got {distance}.");
         }
     }
 }
