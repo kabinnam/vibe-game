@@ -202,7 +202,7 @@ public partial class Guard : CharacterBody3D
 		if (_player == null) return false;
 
 		var space = GetWorld3D().DirectSpaceState;    // physics world used for raycasts
-		Vector3 forward = -GlobalTransform.Basis.Z;   // guard's forward direction (Godot faces -Z)
+		Vector3 forward = -_eyes.GlobalTransform.Basis.Z;   // guard's forward direction (Godot faces -Z)
 
 		foreach (Vector3 offset in SamplePoints)
 		{
