@@ -14,6 +14,13 @@ material = SubResource("StandardMaterial3D_5l2rw")
 radius = 0.4
 height = 1.8
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vi2i3"]
+albedo_color = Color(1, 0.023529412, 0.007843138, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_jbfte"]
+material = SubResource("StandardMaterial3D_vi2i3")
+size = Vector3(0.15, 0.15, 0.15)
+
 [node name="Guard" type="CharacterBody3D" unique_id=1480189877]
 script = ExtResource("1_vq8yj")
 
@@ -27,8 +34,12 @@ mesh = SubResource("CapsuleMesh_b1kcs")
 
 [node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=1078139731]
 avoidance_enabled = true
-radius = 0.45
 height = 1.8
+radius = 0.45
 
 [node name="Eyes" type="Node3D" parent="." unique_id=161188913]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+
+[node name="Nose" type="MeshInstance3D" parent="." unique_id=1907003782]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, -0.5)
+mesh = SubResource("BoxMesh_jbfte")

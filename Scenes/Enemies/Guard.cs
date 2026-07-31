@@ -63,7 +63,6 @@ public partial class Guard : CharacterBody3D
 	private int _wp = 0;                 // index of the current patrol waypoint
 	private float _scanTimer = 0f;       // progress through the current look-around sweep
 	private float _searchTimer = 0f;     // time spent in the current search (drives the timeout)
-	private float _baseYaw;              // facing captured when a scan starts (sweep centers on it)
 	private const float Gravity = 9.8f;  // downward accel so the guard stays on the floor
 
 	private NavigationAgent3D _agent;    // pathfinding component (set in _Ready)
@@ -231,6 +230,7 @@ public partial class Guard : CharacterBody3D
 	// Picks a movement target + speed per state (or scans when arrived).
 	private void ApplyBehavior()
 	{
+	_eyes.Rotation = Vector3.Zero;   // default the gaze to "aligned with the body" every frame
 		switch (_state)
 		{
 			case State.Patrol:
@@ -311,17 +311,16 @@ public partial class Guard : CharacterBody3D
 		MoveAndSlide();                                        // the ONE place we move (avoidance is on)
 	}
 
-	// Sweeps the guard's facing left/right around its arrival heading. Returns true after one full sweep.
-	private bool Scan()
-	{
-		if (_scanTimer == 0f) _baseYaw = Rotation.Y;    // center the sweep on the current facing
-		_scanTimer += (float)GetPhysicsProcessDeltaTime();
-		float phase = _scanTimer / ScanSeconds;          // 0 -> 1 over the sweep
-		// Sin over one full cycle gives a smooth right-then-left-then-back swing.
-		Rotation = new Vector3(0, _baseYaw + Mathf.Sin(phase * Mathf.Tau) * Mathf.DegToRad(ScanArcDeg), 0);
-		if (_scanTimer >= ScanSeconds) { _scanTimer = 0f; return true; }
-		return false;
-	}
+  // Sweeps the gaze (not the body) left/right around the body's facing. Returns true after one full sweep.
+  private bool Scan()
+  {
+	_scanTimer += (float)GetPhysicsProcessDeltaTime();
+	float phase = _scanTimer / ScanSeconds;                        // 0 -> 1 over the sweep
+	float yaw = Mathf.Sin(phase * Mathf.Tau) * Mathf.DegToRad(ScanArcDeg);
+	_eyes.Rotation = new Vector3(0, yaw, 0);                       // rotate the sensor relative to the body
+	if (_scanTimer >= ScanSeconds) { _scanTimer = 0f; return true; }
+	return false;
+  }
 
 	// Yaws the guard to face a world position, staying upright (ignores height).
 	private void FaceToward(Vector3 worldPos)
