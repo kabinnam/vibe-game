@@ -82,6 +82,11 @@ public partial class PlayerController : CharacterBody3D
 
 			// Rotate the camera vertically based on the mouse movement,
 			_camera_mount.RotateX(-mouseMotion.Relative.Y * MouseSensitivity);
+
+			// Clamp the camera mount's vertical rotation to prevent it from going too high or low
+			var rot = _camera_mount.Rotation;
+			rot.X = Mathf.Clamp(rot.X, Mathf.DegToRad(-90f), Mathf.DegToRad(90f));
+			_camera_mount.Rotation = rot;
 		}
 	}
 
