@@ -26,34 +26,6 @@ public partial class PlayerController : CharacterBody3D
 		_animation_player = GetNode<AnimationPlayer>("Visuals/YBot/AnimationPlayer");
 	}
 
-	// public override void _PhysicsProcess(double delta)
-	// {
-	// 	var velocity = Velocity;
-
-	// 	if (!IsOnFloor())
-	// 		velocity.Y -= Gravity * (float)delta;
-
-	// 	if (Input.IsActionJustPressed("jump") && IsOnFloor())
-	// 		velocity.Y = JumpVelocity;
-
-	// 	var inputDir = Input.GetVector("move_left", "move_right", "move_forward", "move_backward");
-	// 	var direction = (Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
-
-	// 	if (direction != Vector3.Zero)
-	// 	{
-	// 		velocity.X = direction.X * Speed;
-	// 		velocity.Z = direction.Z * Speed;
-	// 	}
-	// 	else
-	// 	{
-	// 		velocity.X = Mathf.MoveToward(velocity.X, 0, Speed);
-	// 		velocity.Z = Mathf.MoveToward(velocity.Z, 0, Speed);
-	// 	}
-
-	// 	Velocity = velocity;
-	// 	MoveAndSlide();
-	// }
-
 	public override void _Input(InputEvent @event)
 	{
 		// Handle mouse movement
