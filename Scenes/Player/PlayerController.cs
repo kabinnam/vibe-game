@@ -12,7 +12,7 @@ public partial class PlayerController : CharacterBody3D
 	// Non-Exported Variables
 	public float Speed = 3.0f;
 	public bool is_running = false;
-	public bool is_locked = false;
+	public bool is_locked = false; // If the player is locked, they cannot move or rotate (Useful for actions like kicking or maybe smoking?)
 
 	private Node3D _camera_mount;
 	private Node3D _visuals;
@@ -25,21 +25,6 @@ public partial class PlayerController : CharacterBody3D
 		_visuals = GetNode<Node3D>("Visuals");
 		_animation_player = GetNode<AnimationPlayer>("Visuals/YBot/AnimationPlayer");
 	}
-
-	// public override void _UnhandledInput(InputEvent @event)
-	// {
-	// 	if (@event is InputEventMouseMotion mouseMotion)
-	// 	{
-	// 		RotateY(-mouseMotion.Relative.X * MouseSensitivity);
-	// 		_head.RotateX(-mouseMotion.Relative.Y * MouseSensitivity);
-	// 		var rot = _head.Rotation;
-	// 		rot.X = Mathf.Clamp(rot.X, Mathf.DegToRad(-90f), Mathf.DegToRad(90f));
-	// 		_head.Rotation = rot;
-	// 	}
-
-	// 	if (@event.IsActionPressed("ui_cancel"))
-	// 		Input.MouseMode = Input.MouseModeEnum.Visible;
-	// }
 
 	// public override void _PhysicsProcess(double delta)
 	// {
