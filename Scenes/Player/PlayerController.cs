@@ -45,6 +45,14 @@ public partial class PlayerController : CharacterBody3D
 			rot.X = Mathf.Clamp(rot.X, Mathf.DegToRad(-90f), Mathf.DegToRad(90f));
 			_camera_mount.Rotation = rot;
 		}
+
+		// Toggle the mouse cursor: first press frees it, next press recaptures it
+		if (@event.IsActionPressed("ui_cancel"))
+		{
+			Input.MouseMode = Input.MouseMode == Input.MouseModeEnum.Captured
+				? Input.MouseModeEnum.Visible
+				: Input.MouseModeEnum.Captured;
+		}
 	}
 
 	public override void _PhysicsProcess(double delta)
