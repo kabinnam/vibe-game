@@ -46,10 +46,12 @@ public partial class PlayerController : CharacterBody3D
 			_camera_mount.Rotation = rot;
 		}
 
-		// Release the captured mouse cursor so the window can be closed
+		// Toggle the mouse cursor: first press frees it, next press recaptures it
 		if (@event.IsActionPressed("ui_cancel"))
 		{
-			Input.MouseMode = Input.MouseModeEnum.Visible;
+			Input.MouseMode = Input.MouseMode == Input.MouseModeEnum.Captured
+				? Input.MouseModeEnum.Visible
+				: Input.MouseModeEnum.Captured;
 		}
 	}
 
