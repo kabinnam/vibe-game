@@ -11,6 +11,10 @@ public partial class PlayerController : CharacterBody3D
 
 	// Camera tunables
 	[Export] public float TiltLimitDegrees = 80.0f; // how far up and down the player can look--keeps us from inverting the camera and helps prevent looking inside the model.
+	[Export] public float ThirdPersonSpringLength = 2.5f;
+	[Export] public float ThirdPersonFov = 75.0f;
+	[Export] public float FirstPersonFov = 90.0f;
+	[Export] public Vector3 FirstPersonCameraOffset = new Vector3(0.0f, 0.16f, -0.22f); // manually tweaked and very specific to our ybot model. pushes first person camera right in front of th face.
 
 	// Non-Exported Variables
 	public float Speed = 3.0f;
@@ -21,7 +25,9 @@ public partial class PlayerController : CharacterBody3D
 	private AnimationPlayer _animation_player;
 
 	private Node3D _springArmPivot;
+	private SpringArm3D _springArm;
 	private Camera3D _camera;
+	private bool _firstPerson = false;
 
 	public override void _Ready()
 	{
@@ -30,8 +36,11 @@ public partial class PlayerController : CharacterBody3D
 		_animation_player = GetNode<AnimationPlayer>("Visuals/YBot/AnimationPlayer");
 
 		_springArmPivot = GetNode<Node3D>("SpringArmPivot");
-		_camera = GetNode<Camera3D>("SpringArmPivot/SpringArm3D/Camera3D");
+		_springArm = GetNode<SpringArm3D>("SpringArmPivot/SpringArm3D");
+		_camera = GetNode<Camera3D>("SpringArmPivot/SpringArm3D/CameraBoom/Camera3D"); // Camera3D intentionally not direct child of SpringArm3D because the spring arm wants to overwrite the position of its direct child.
 		_camera.Current = true;
+
+		ApplyPerspective();
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
@@ -52,6 +61,13 @@ public partial class PlayerController : CharacterBody3D
 			Input.MouseMode = Input.MouseMode == Input.MouseModeEnum.Captured
 				? Input.MouseModeEnum.Visible
 				: Input.MouseModeEnum.Captured;
+		}
+
+		// Toggle between first- and third-person view
+		if (@event.IsActionPressed("toggle_perspective"))
+		{
+			_firstPerson = !_firstPerson;
+			ApplyPerspective();
 		}
 	}
 
@@ -113,9 +129,6 @@ public partial class PlayerController : CharacterBody3D
 						_animation_player.Play("Walking/mixamo_com");
 					}
 				}
-
-				// Face the movement direction (model authored facing +Z, so aim away from it)
-				_visuals.LookAt(_visuals.GlobalPosition - direction, Vector3.Up);
 			}
 
 			velocity.X = direction.X * Speed;
@@ -132,10 +145,48 @@ public partial class PlayerController : CharacterBody3D
 			velocity.Z = Mathf.MoveToward(Velocity.Z, 0, Speed);
 		}
 
+		// Update which way the character model faces (differs by perspective)
+		if (!is_locked)
+		{
+			UpdateCharacterFacing(direction);
+		}
+
 		Velocity = velocity;
 		if(!is_locked)
 		{
 			MoveAndSlide();
+		}
+	}
+
+	private void ApplyPerspective()
+	{
+		if (_firstPerson)
+		{
+			_springArm.SpringLength = 0f;
+			_camera.Position = FirstPersonCameraOffset;
+			_camera.Fov = FirstPersonFov;
+		}
+		else
+		{
+			_springArm.SpringLength = ThirdPersonSpringLength;
+			_camera.Position = Vector3.Zero;
+			_camera.Fov = ThirdPersonFov;
+		}
+	}
+
+	private void UpdateCharacterFacing(Vector3 moveDirection)
+	{
+		if (_firstPerson)
+		{
+			// Face where we are looking (pivot forward, flattened)
+			Vector3 look = -_springArmPivot.GlobalTransform.Basis.Z;
+			look.Y = 0f;
+			_visuals.LookAt(_visuals.GlobalPosition - look.Normalized(), Vector3.Up);
+		}
+		else if (moveDirection != Vector3.Zero)
+		{
+			// Third person: face the movement direction
+			_visuals.LookAt(_visuals.GlobalPosition - moveDirection, Vector3.Up);
 		}
 	}
 }
