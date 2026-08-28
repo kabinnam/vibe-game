@@ -181,12 +181,12 @@ public partial class PlayerController : CharacterBody3D
 			// Face where we are looking (pivot forward, flattened)
 			Vector3 look = -_springArmPivot.GlobalTransform.Basis.Z;
 			look.Y = 0f;
-			_visuals.LookAt(_visuals.GlobalPosition - look.Normalized(), Vector3.Up);
+			_visuals.LookAt(_visuals.GlobalPosition + look.Normalized(), Vector3.Up);
 		}
 		else if (moveDirection != Vector3.Zero)
 		{
 			// Third person: face the movement direction
-			_visuals.LookAt(_visuals.GlobalPosition - moveDirection, Vector3.Up);
+			_visuals.LookAt(_visuals.GlobalPosition + moveDirection, Vector3.Up);
 		}
 	}
 }
