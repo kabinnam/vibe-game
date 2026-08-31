@@ -235,8 +235,8 @@ shape = SubResource("CapsuleShape3D_1")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 
 [node name="SpringArm3D" type="SpringArm3D" parent="SpringArmPivot" unique_id=1371699011]
-spring_length = 2.5
 shape = SubResource("SphereShape3D_cam")
+spring_length = 2.5
 
 [node name="CameraBoom" type="Node3D" parent="SpringArmPivot/SpringArm3D" unique_id=343505845]
 

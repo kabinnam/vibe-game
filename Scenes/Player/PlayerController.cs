@@ -14,7 +14,7 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float ThirdPersonSpringLength = 2.5f;
 	[Export] public float ThirdPersonFov = 75.0f;
 	[Export] public float FirstPersonFov = 90.0f;
-	[Export] public Vector3 FirstPersonCameraOffset = new Vector3(0.0f, 0.16f, -0.22f); // manually tweaked and very specific to our ybot model. pushes first person camera right in front of th face.
+	[Export] public Vector3 FirstPersonCameraOffset = new Vector3(0.0f, 0.16f, -0.22f); // manually tweaked and very specific to our ybot model. pushes first person camera right in front of the face.
 
 	// Non-Exported Variables
 	public float Speed = 3.0f;
@@ -145,15 +145,11 @@ public partial class PlayerController : CharacterBody3D
 			velocity.Z = Mathf.MoveToward(Velocity.Z, 0, Speed);
 		}
 
-		// Update which way the character model faces (differs by perspective)
-		if (!is_locked)
-		{
-			UpdateCharacterFacing(direction);
-		}
-
 		Velocity = velocity;
+		// While locked (e.g. mid-kick) the character neither turns nor moves
 		if(!is_locked)
 		{
+			UpdateCharacterFacing(direction);
 			MoveAndSlide();
 		}
 	}
@@ -176,17 +172,25 @@ public partial class PlayerController : CharacterBody3D
 
 	private void UpdateCharacterFacing(Vector3 moveDirection)
 	{
+		Vector3 faceDirection;
 		if (_firstPerson)
 		{
-			// Face where we are looking (pivot forward, flattened)
-			Vector3 look = -_springArmPivot.GlobalTransform.Basis.Z;
-			look.Y = 0f;
-			_visuals.LookAt(_visuals.GlobalPosition + look.Normalized(), Vector3.Up);
+			// First person: face where we are looking (pivot forward, flattened)
+			faceDirection = -_springArmPivot.GlobalTransform.Basis.Z;
+			faceDirection.Y = 0f;
+			faceDirection = faceDirection.Normalized();
 		}
 		else if (moveDirection != Vector3.Zero)
 		{
 			// Third person: face the movement direction
-			_visuals.LookAt(_visuals.GlobalPosition + moveDirection, Vector3.Up);
+			faceDirection = moveDirection;
 		}
+		else
+		{
+			// Third person and standing still: keep current facing
+			return;
+		}
+
+		_visuals.LookAt(_visuals.GlobalPosition + faceDirection, Vector3.Up);
 	}
 }
