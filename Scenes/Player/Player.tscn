@@ -9,6 +9,9 @@
 radius = 0.35
 height = 1.8
 
+[sub_resource type="SphereShape3D" id="SphereShape3D_cam"]
+radius = 0.2
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gffps"]
 resource_name = "Alpha_Body_MAT"
 vertex_color_use_as_albedo = true
@@ -228,16 +231,21 @@ script = ExtResource("1")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
 
-[node name="CameraMount" type="Node3D" parent="." unique_id=1775019905]
+[node name="SpringArmPivot" type="Node3D" parent="." unique_id=1775019905]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 
-[node name="Camera3D" type="Camera3D" parent="CameraMount" unique_id=889858138]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.20370817, 1.7913222)
+[node name="SpringArm3D" type="SpringArm3D" parent="SpringArmPivot" unique_id=1371699011]
+shape = SubResource("SphereShape3D_cam")
+spring_length = 2.5
+
+[node name="CameraBoom" type="Node3D" parent="SpringArmPivot/SpringArm3D" unique_id=343505845]
+
+[node name="Camera3D" type="Camera3D" parent="SpringArmPivot/SpringArm3D/CameraBoom" unique_id=889858138]
 
 [node name="Visuals" type="Node3D" parent="." unique_id=201235687]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
 [node name="YBot" type="Node3D" parent="Visuals" unique_id=292012719]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
 [node name="GeneralSkeleton" type="Skeleton3D" parent="Visuals/YBot" unique_id=888788673]
 unique_name_in_owner = true
