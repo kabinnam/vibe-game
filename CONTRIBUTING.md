@@ -30,6 +30,19 @@ keep their own settings. It requires the Anysphere C# extension (`anysphere.csha
 
 With this in place, saving a `.cs` file auto-formats it to match the project style.
 
+### Godot's built-in script editor (indentation)
+
+Godot's built-in script editor has a single indentation setting that applies to every
+language, and it defaults to tabs. If it ever writes a `.cs` file — it can rewrite scripts
+on build/run — it converts spaces to tabs and fights `.editorconfig`. Set it to spaces
+once, per machine, via Editor > Editor Settings > Text Editor > Behavior > Indent:
+
+- Type: Spaces
+- Size: 4
+
+This is a global (per-machine) Godot setting, not part of the repo, so every contributor
+needs it. It's safe here because this project has no GDScript (`.gd`) files.
+
 ### Checking / applying formatting from the CLI
 
 Format-on-save covers day-to-day work. Reach for the `dotnet format` CLI when you want
