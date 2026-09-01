@@ -58,9 +58,9 @@ public partial class Guard : CharacterBody3D
     private static readonly Vector3[] SamplePoints =
     {
         new Vector3(0f, 0.2f, 0f),   // low
-		new Vector3(0f, 0.9f, 0f),   // torso
-		new Vector3(0f, 1.7f, 0f),   // head
-	};
+        new Vector3(0f, 0.9f, 0f),   // torso
+        new Vector3(0f, 1.7f, 0f),   // head
+    };
 
     private AwarenessMeter _meter;       // analog awareness in [0, 1]; the FSM below decides when to fill/decay
     private Vector3 _lastSeenPos;        // where the player was most recently seen (used by Searching)
@@ -68,7 +68,7 @@ public partial class Guard : CharacterBody3D
     private int _wp = 0;                 // index of the current patrol waypoint
     private float _scanTimer = 0f;       // progress through the current look-around sweep
     private float _searchTimer = 0f;     // time spent in the current search (drives the timeout)
-    private const float Gravity = 9.8f;  // downward accel so the guard stays on the floor
+    private float _gravity;              // downward accel, read from ProjectSettings in _Ready
 
     private NavigationAgent3D _agent;    // pathfinding component (set in _Ready)
     private Node3D _eyes;                // vision origin (child node at eye height)
@@ -96,6 +96,7 @@ public partial class Guard : CharacterBody3D
         _lookMod.Influence = 0f;                                 // start off; UpdateHeadTracking ramps it when aware
         _player = GetTree().GetFirstNodeInGroup("player") as Node3D;
         _meter = new AwarenessMeter(DetectRate, DecayRate);
+        _gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").As<float>();
         BuildVisionCone();
         BuildDebugLabel();
 
@@ -127,8 +128,8 @@ public partial class Guard : CharacterBody3D
     {
         _animState.Travel(_scanning ? "Scan" : "Move");
 
-        float speed = new Vector2(Velocity.X, Velocity.Z).Length();   // horizontal speed only (ignore gravity on Y)
-        _animTree.Set("parameters/Move/blend_position", speed);       // 0 -> stand idle, ~1.5 -> walk, ~3.5 -> jog
+        float speed = HorizontalSpeed;
+        _animTree.Set("parameters/Move/blend_position", speed);   // 0 -> stand idle, ~1.5 -> walk, ~3.5 -> jog
     }
 
     // SEAM (Vision): when you add more enemy types, the perception here (the vision cone + the
@@ -214,7 +215,7 @@ public partial class Guard : CharacterBody3D
     //   Why: individually these server-side raycasts are cheap, but they add up fast with many
     //   guards. The standard guidance is to run perception on a Timer at ~0.1-0.2s intervals.
     //   How (so behavior stays identical): integrate the detection meter over the ACTUAL elapsed
-    //   interval (not the per-frame delta), and consider keeping FaceToward() per-frame for smooth
+    //   interval (not the per-frame delta), and consider keeping TurnBodyToward() per-frame for smooth
     //   tracking. Left per-frame for now: a single guard is cheap and per-frame gives the smoothest facing.
     //   Refs: Godot ray-casting docs - https://docs.godotengine.org/en/stable/tutorials/physics/ray-casting.html
     //         Stealth FOV guide (recommends a 0.1-0.2s Timer) - https://uhiyama-lab.com/en/notes/godot/stealth-fov-system/
@@ -247,7 +248,7 @@ public partial class Guard : CharacterBody3D
     }
 
     // SEAM (Mover): the navmesh steering here could become a reusable Mover node/scene shared by
-    // any NPC; ApplyBehavior/PatrolStep/SearchStep are the per-state actions half of the FSM seam.
+    // any NPC; ApplyBehavior/GoToAndScan are the per-state actions half of the FSM seam.
 
     // Picks a movement target + speed per state (or scans when arrived).
     private void ApplyBehavior()
@@ -256,7 +257,10 @@ public partial class Guard : CharacterBody3D
         switch (_state)
         {
             case State.Patrol:
-                PatrolStep();
+                if (Waypoints.Count == 0)
+                    StandStill();
+                else if (GoToAndScan(Waypoints[_wp].GlobalPosition, PatrolSpeed))
+                    _wp = (_wp + 1) % Waypoints.Count;   // sweep done -> next waypoint (wraps around)
                 break;
             case State.Suspicious:
                 MoveTo(_lastSeenPos, SuspiciousSpeed);   // creep toward the last-seen spot (= the player while visible)
@@ -266,43 +270,25 @@ public partial class Guard : CharacterBody3D
                     MoveTo(_player.GlobalPosition, ChaseSpeed);
                 break;
             case State.Searching:
-                SearchStep();
+                GoToAndScan(_lastSeenPos, SearchSpeed);   // decay in UpdatePerception eventually returns us to Patrol
                 break;
         }
     }
 
-    // Patrol: walk to the current waypoint; on arrival, sweep-look, then advance to the next.
-    private void PatrolStep()
+    // Travels to a world target across the navmesh; on arrival, stands and scans in place.
+    // Returns true when a full scan interval completes: Patrol uses that to advance its waypoint;
+    // Search ignores it and lets the awareness decay end the search.
+    private bool GoToAndScan(Vector3 target, float speed)
     {
-        if (Waypoints.Count == 0) { StandStill(); return; }
-        Vector3 target = Waypoints[_wp].GlobalPosition;
         _agent.TargetPosition = target;
         if (_agent.IsNavigationFinished())
         {
             StandStill();
             _scanning = true;
-            if (Scan()) _wp = (_wp + 1) % Waypoints.Count;   // sweep done -> next waypoint (wraps around)
+            return Scan();
         }
-        else
-        {
-            MoveTo(target, PatrolSpeed);
-        }
-    }
-
-    // Searching: travel to the last-seen spot, then look around while the meter decays toward giving up.
-    private void SearchStep()
-    {
-        _agent.TargetPosition = _lastSeenPos;
-        if (_agent.IsNavigationFinished())
-        {
-            StandStill();
-            _scanning = true;
-            Scan();   // keep sweeping; UpdatePerception's decay is what eventually returns us to Patrol
-        }
-        else
-        {
-            MoveTo(_lastSeenPos, SearchSpeed);
-        }
+        MoveTo(target, speed);
+        return false;
     }
 
     // Steers the guard toward a target across the navmesh, feeding a desired velocity to avoidance.
@@ -317,7 +303,7 @@ public partial class Guard : CharacterBody3D
         Vector3 dir = _agent.GetNextPathPosition() - GlobalPosition;  // toward the next point on the path
         dir.Y = 0;                                                    // horizontal only; gravity handles vertical
         dir = dir.Normalized();
-        FaceToward(GlobalPosition + dir);                             // face the travel direction
+        TurnBodyToward(GlobalPosition + dir, (float)GetPhysicsProcessDeltaTime());   // face the travel direction
         _agent.Velocity = dir * speed;                                // desired velocity -> triggers OnVelocityComputed
     }
 
@@ -325,13 +311,19 @@ public partial class Guard : CharacterBody3D
     // happen in the callback even when the guard isn't actively walking (e.g. while scanning).
     private void StandStill() => _agent.Velocity = Vector3.Zero;
 
+    // Horizontal speed only (ignores vertical/gravity on Y).
+    private float HorizontalSpeed => new Vector2(Velocity.X, Velocity.Z).Length();
+
+    // Frame-rate-independent smoothing: how far to ease toward a target in one frame of length dt.
+    private static float EaseFactor(float rate, float dt) => 1f - Mathf.Exp(-rate * dt);
+
     // Applies the avoidance-adjusted (safe) velocity plus gravity, then moves. Fired by the agent's signal.
     private void OnVelocityComputed(Vector3 safeVelocity)
     {
         Vector3 v = Velocity;
         v.X = safeVelocity.X;                                  // avoidance-adjusted horizontal velocity
         v.Z = safeVelocity.Z;
-        v.Y -= Gravity * (float)GetPhysicsProcessDeltaTime();  // keep the guard on the floor
+        v.Y -= _gravity * (float)GetPhysicsProcessDeltaTime();  // keep the guard on the floor
         Velocity = v;
         MoveAndSlide();                                        // the ONE place we move (avoidance is on)
     }
@@ -346,17 +338,13 @@ public partial class Guard : CharacterBody3D
         return false;
     }
 
-    // Turns the guard's body to face a world position, smoothed (eased yaw) so travel turns and the
-    // head re-center never snap. This is the deferred body-turn smoothing.
-    private void FaceToward(Vector3 worldPos) => TurnBodyToward(worldPos, (float)GetPhysicsProcessDeltaTime());
-
     // Smoothly eases the body's yaw toward a world point (horizontal only, no tilt).
     private void TurnBodyToward(Vector3 worldPos, float dt)
     {
         worldPos.Y = GlobalPosition.Y;                        // level: turn, don't tilt
         if (worldPos.IsEqualApprox(GlobalPosition)) return;   // nothing to face -> skip
         Basis desired = GlobalTransform.LookingAt(worldPos, Vector3.Up).Basis;
-        float t = 1f - Mathf.Exp(-BodyTurnRate * dt);         // frame-rate-independent ease
+        float t = EaseFactor(BodyTurnRate, dt);
         Basis blended = GlobalTransform.Basis.Orthonormalized().Slerp(desired.Orthonormalized(), t);
         GlobalTransform = new Transform3D(blended, GlobalPosition);
     }
@@ -376,7 +364,7 @@ public partial class Guard : CharacterBody3D
     // turn the body to re-center it - with hysteresis so it doesn't shuffle-step at the edge.
     private void UpdateHeadTracking(float dt)
     {
-        float ease = 1f - Mathf.Exp(-HeadTrackRate * dt);
+        float ease = EaseFactor(HeadTrackRate, dt);
 
         if (LookPoint() is Vector3 point)
         {
@@ -386,7 +374,7 @@ public partial class Guard : CharacterBody3D
             _lookMod.Influence = Mathf.Lerp(_lookMod.Influence, 1f, ease);
 
             // Re-center only while essentially stopped; when moving, MoveTo already faces the body toward travel.
-            bool stationary = new Vector2(Velocity.X, Velocity.Z).Length() < 0.3f;
+            bool stationary = HorizontalSpeed < 0.3f;
             float yawDeg = Mathf.RadToDeg(FlatAngleTo(point));
             if (!stationary) _bodyTurning = false;
             else if (yawDeg > NeckLimitDeg) _bodyTurning = true;             // target past the neck -> start turning
@@ -423,7 +411,7 @@ public partial class Guard : CharacterBody3D
         else
             desired = GlobalTransform.Basis;             // else: aligned with the body's facing
 
-        float t = 1f - Mathf.Exp(-GazeBlendRate * dt);   // frame-rate-independent ease factor
+        float t = EaseFactor(GazeBlendRate, dt);
 
         // Slerp converts each basis to a quaternion internally, which REQUIRES normalized
         // (scale-free) bases. Bone/body/look-at bases can carry scale or float drift, so clean
