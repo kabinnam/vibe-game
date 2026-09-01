@@ -28,9 +28,6 @@ csharp_indent_case_contents_when_block = false
 dotnet_sort_system_directives_first = true
 csharp_using_directive_placement = outside_namespace:warning
 
-# File-scoped namespaces (C# 10+)
-csharp_style_namespace_declarations = file_scoped:warning
-
 # Require explicit access modifiers
 dotnet_style_require_accessibility_modifiers = always
 dotnet_diagnostic.IDE0040.severity = warning
