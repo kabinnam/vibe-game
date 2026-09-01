@@ -62,7 +62,7 @@ public partial class Guard : CharacterBody3D
 		new Vector3(0f, 1.7f, 0f),   // head
 	};
 
-    private float _detection = 0f;       // awareness meter in [0, 1]; 1 = fully alerted
+    private AwarenessMeter _meter;       // analog awareness in [0, 1]; the FSM below decides when to fill/decay
     private Vector3 _lastSeenPos;        // where the player was most recently seen (used by Searching)
 
     private int _wp = 0;                 // index of the current patrol waypoint
@@ -95,6 +95,7 @@ public partial class Guard : CharacterBody3D
         _lookMod.TargetNode = _lookMod.GetPathTo(_lookTarget);   // tell the modifier which node to aim the head at
         _lookMod.Influence = 0f;                                 // start off; UpdateHeadTracking ramps it when aware
         _player = GetTree().GetFirstNodeInGroup("player") as Node3D;
+        _meter = new AwarenessMeter(DetectRate, DecayRate);
         BuildVisionCone();
         BuildDebugLabel();
 
@@ -153,44 +154,42 @@ public partial class Guard : CharacterBody3D
             case State.Suspicious:
                 if (seen)
                 {
-                    _detection += DetectRate * DistanceFactor() * dt;   // gradual first-contact ramp
-                    if (_detection >= 1f) _state = State.Targeting;
+                    _meter.Fill(dt, DistanceFactor());                  // gradual first-contact ramp
+                    if (_meter.Value >= 1f) _state = State.Targeting;
                 }
-                else if (_detection > SearchThreshold)
+                else if (_meter.Value > SearchThreshold)
                 {
                     EnterSearching();                                   // was pretty sure -> go investigate
                 }
                 else
                 {
-                    _detection -= DecayRate * dt;                       // fleeting glimpse -> forget it
-                    if (_detection <= 0f) _state = State.Patrol;
+                    _meter.Decay(dt);                                   // fleeting glimpse -> forget it
+                    if (_meter.Value <= 0f) _state = State.Patrol;
                 }
                 break;
 
             case State.Targeting:
                 // Fully alerted; drops to a search the moment line of sight is lost.
-                _detection = 1f;
+                _meter.Pin();
                 if (!seen) EnterSearching();
                 break;
 
             case State.Searching:
                 if (seen)
                 {
-                    _detection += DetectRate * DistanceFactor() * dt;   // resume filling (instant when ~1)
-                    if (_detection >= 1f) _state = State.Targeting;
+                    _meter.Fill(dt, DistanceFactor());                  // resume filling (instant when ~1)
+                    if (_meter.Value >= 1f) _state = State.Targeting;
                 }
                 else
                 {
                     _searchTimer += dt;
                     if (_agent.IsNavigationFinished())                  // only decay once we've reached the spot
-                        _detection -= DecayRate * dt;
-                    if (_detection <= 0f || _searchTimer >= SearchTimeout)
+                        _meter.Decay(dt);
+                    if (_meter.Value <= 0f || _searchTimer >= SearchTimeout)
                         _state = State.Patrol;                          // give up: found nothing, or timed out
                 }
                 break;
         }
-
-        _detection = Mathf.Clamp(_detection, 0f, 1f);   // keep within [0, 1]
     }
 
     // Enter the active search: keep the current meter value (memory) and reset the search timer.
@@ -447,7 +446,7 @@ public partial class Guard : CharacterBody3D
     {
         Color c = StateColor();
         _coneMat.AlbedoColor = new Color(c.R, c.G, c.B, 0.01f);   // hue by state, alpha kept faint
-        _label.Text = $"{_state} {(int)(_detection * 100f)}%";
+        _label.Text = $"{_state} {(int)(_meter.Value * 100f)}%";
         _label.Modulate = c;
     }
 
