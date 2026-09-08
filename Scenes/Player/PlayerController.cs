@@ -73,7 +73,15 @@ public partial class PlayerController : CharacterBody3D
 
 	public override void _PhysicsProcess(double delta)
 	{
-		// Handle kick
+		// Handle smoking
+		if(Input.IsActionJustPressed("smoke"))
+		{
+			if(_animation_player.GetCurrentAnimation() != "Smoking/mixamo_com")
+			{
+				_animation_player.Play("Smoking/mixamo_com");
+				is_locked = true;
+			}
+		}
 
 		if(!_animation_player.IsPlaying())
 		{
