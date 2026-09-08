@@ -1,0 +1,35 @@
+[gd_scene format=3 uid="uid://c2bmala3ktlix"]
+
+[ext_resource type="Script" uid="uid://c1xlls0abuopf" path="res://Scenes/UI/MainMenu.cs" id="1_g18y6"]
+
+[node name="MainMenu" type="Control" unique_id=1526995782]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_g18y6")
+
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=1177469458]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer" unique_id=2074186438]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CenterContainer/VBoxContainer" unique_id=1811552529]
+layout_mode = 2
+text = "VibeGame"
+
+[node name="StartButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=4774611]
+layout_mode = 2
+text = "Start Game"
+
+[node name="QuitButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=124986006]
+layout_mode = 2
+text = "Quit"
