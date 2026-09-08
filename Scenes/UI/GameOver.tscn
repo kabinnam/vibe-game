@@ -1,0 +1,35 @@
+[gd_scene format=3 uid="uid://id124ilvtpp2"]
+
+[ext_resource type="Script" uid="uid://f3wvtrjygsxj" path="res://Scenes/UI/GameOver.cs" id="1_n002h"]
+
+[node name="GameOver" type="Control" unique_id=1342374889]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_n002h")
+
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=1116499428]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer" unique_id=1774935975]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CenterContainer/VBoxContainer" unique_id=2121174095]
+layout_mode = 2
+text = "Game Over!"
+
+[node name="RestartButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=525767934]
+layout_mode = 2
+text = "Restart"
+
+[node name="QuitButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=162594682]
+layout_mode = 2
+text = "Quit"
