@@ -8,9 +8,9 @@ namespace VibeGame.Enemies;
 // raycasting, so cover genuinely hides the player. The guard patrols a waypoint loop,
 // investigates, and chases using its NavigationAgent3D (with RVO avoidance).
 //
-// Organization note: this is one cohesive script for a single enemy type. If a second enemy
-// type appears, the "SEAM" comments below mark the natural pieces to extract into reusable
-// component nodes/scenes (Vision, Mover) or a node-based state machine.
+// Organization note: this is one cohesive script for a single enemy type. Perception now lives
+// in the reusable VisionSensor node; the remaining "SEAM" comments below mark the next natural
+// pieces to extract (Mover) or a node-based state machine.
 public partial class Guard : CharacterBody3D
 {
     // Awareness levels, in escalating order.
@@ -27,9 +27,7 @@ public partial class Guard : CharacterBody3D
 
     private State _state = State.Patrol;
 
-    [ExportGroup("Perception")]
-    [Export] public float ViewDistance { get; set; } = 8f;   // how far the guard can see, in meters
-    [Export] public float ViewAngleDeg { get; set; } = 28f;  // half-angle of the vision cone (full FOV is twice this)
+    [ExportGroup("Detection")]
     [Export] public float DetectRate { get; set; } = 1.5f;   // detection gained/sec at point-blank (scaled by distance)
     [Export] public float DecayRate { get; set; } = 0.5f;    // detection lost/sec while the player is not visible
 
@@ -44,7 +42,7 @@ public partial class Guard : CharacterBody3D
     [Export] public float ScanSeconds { get; set; } = 2.0f;  // how long the guard dwells and scans at a waypoint
 
     [ExportGroup("Gaze & Head Tracking")]
-    [Export] public float GazeBlendRate { get; set; } = 8f;   // how fast the cone eases toward its target orientation
+    [Export] public float GazeBlendRate { get; set; } = 8f;   // how fast the cone eases toward the head's yaw
     [Export] public float HeadTrackRate { get; set; } = 10f;  // how fast the head look eases in/out (visual only)
     [Export] public float BodyTurnRate { get; set; } = 6f;    // how fast the body turns (locomotion facing + re-centering the head)
     [Export] public float NeckLimitDeg { get; set; } = 70f;   // once the target passes this yaw from facing, the body turns to re-center
@@ -52,15 +50,6 @@ public partial class Guard : CharacterBody3D
     [ExportGroup("Search")]
     [Export] public float SearchThreshold { get; set; } = 0.5f;  // suspicion above which losing sight triggers a search
     [Export] public float SearchTimeout { get; set; } = 8f;      // give up searching after this many seconds (unreachable safety)
-
-    // Points sampled on the player's body (feet / torso / head). Seeing ANY one counts as
-    // "seen", so a player peeking over low cover is still detected.
-    private static readonly Vector3[] SamplePoints =
-    {
-        new Vector3(0f, 0.2f, 0f),   // low
-        new Vector3(0f, 0.9f, 0f),   // torso
-        new Vector3(0f, 1.7f, 0f),   // head
-    };
 
     private AwarenessMeter _meter;       // analog awareness in [0, 1]; the FSM below decides when to fill/decay
     private Vector3 _lastSeenPos;        // where the player was most recently seen (used by Searching)
@@ -71,9 +60,8 @@ public partial class Guard : CharacterBody3D
     private float _gravity;              // downward accel, read from ProjectSettings in _Ready
 
     private NavigationAgent3D _agent;    // pathfinding component (set in _Ready)
-    private Node3D _eyes;                // vision origin (child node at eye height)
+    private VisionSensor _vision;        // reusable perception sensor (cone + line-of-sight); owner points it each frame
     private Node3D _player;              // cached player reference (found via the "player" group)
-    private StandardMaterial3D _coneMat; // debug cone material (recolored per state)
     private Label3D _label;              // debug readout floating above the guard
     private AnimationTree _animTree;     // drives the model's animation (state machine + locomotion blend)
     private AnimationNodeStateMachinePlayback _animState;  // handle used to switch between the "Move" and "Scan" states
@@ -86,7 +74,7 @@ public partial class Guard : CharacterBody3D
     // Runs once when the guard enters the scene tree (Godot lifecycle).
     public override void _Ready()
     {
-        _eyes = GetNode<Node3D>("Eyes");
+        _vision = GetNode<VisionSensor>("VisionSensor");
         _animTree = GetNode<AnimationTree>("GuardModel/AnimationTree");
         _animState = _animTree.Get("parameters/playback").As<AnimationNodeStateMachinePlayback>();
         _headGaze = GetNode<Node3D>("GuardModel/GeneralSkeleton/HeadAttach/HeadGaze");
@@ -97,7 +85,6 @@ public partial class Guard : CharacterBody3D
         _player = GetTree().GetFirstNodeInGroup("player") as Node3D;
         _meter = new AwarenessMeter(DetectRate, DecayRate);
         _gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").As<float>();
-        BuildVisionCone();
         BuildDebugLabel();
 
         // The agent's static avoidance settings (avoidance_enabled / radius / height) now live on
@@ -132,16 +119,23 @@ public partial class Guard : CharacterBody3D
         _animTree.Set("parameters/Move/blend_position", speed);   // 0 -> stand idle, ~1.5 -> walk, ~3.5 -> jog
     }
 
-    // SEAM (Vision): when you add more enemy types, the perception here (the vision cone + the
-    // line-of-sight sampling in CanSeePlayer) is the natural piece to extract into a reusable
-    // Vision sensor node/scene that any NPC can attach.
-
     // Advances the awareness meter and state machine. Detection ramps up gradually; the meter value
     // is carried into Searching as "memory", so a re-sight resumes filling (effectively instant when
     // the meter was still ~1, a quick ramp when it was only suspicious).
     private void UpdatePerception(double delta)
     {
-        bool seen = CanSeePlayer();
+        // TODO (perf - revisit when spawning many guards): throttle this vision check instead of
+        // running it every physics frame.
+        //   What: _vision.CanSee() runs here ~60x/sec, and each call fires up to 3 raycasts (one per
+        //   body sample) = ~180 server raycasts/sec PER guard.
+        //   Why: each raycast is cheap, but they add up fast with many guards. Standard guidance is to
+        //   run perception on a Timer at ~0.1-0.2s intervals.
+        //   How (behavior-preserving): integrate the meter over the ACTUAL elapsed interval (not the
+        //   per-frame delta) and keep TurnBodyToward per-frame for smooth facing. Left per-frame for
+        //   now: a couple of guards are cheap and per-frame gives the smoothest tracking.
+        //   Refs: Godot ray-casting - https://docs.godotengine.org/en/stable/tutorials/physics/ray-casting.html
+        //         Stealth FOV guide (0.1-0.2s Timer) - https://uhiyama-lab.com/en/notes/godot/stealth-fov-system/
+        bool seen = _player != null && _vision.CanSee(_player, GetRid());
         float dt = (float)delta;                        // seconds elapsed this frame
         if (seen) _lastSeenPos = _player.GlobalPosition;
 
@@ -155,7 +149,7 @@ public partial class Guard : CharacterBody3D
             case State.Suspicious:
                 if (seen)
                 {
-                    _meter.Fill(dt, DistanceFactor());                  // gradual first-contact ramp
+                    _meter.Fill(dt, _vision.DistanceFactor(_player.GlobalPosition));   // gradual first-contact ramp
                     if (_meter.Value >= 1f) _state = State.Targeting;
                 }
                 else if (_meter.Value > SearchThreshold)
@@ -178,7 +172,7 @@ public partial class Guard : CharacterBody3D
             case State.Searching:
                 if (seen)
                 {
-                    _meter.Fill(dt, DistanceFactor());                  // resume filling (instant when ~1)
+                    _meter.Fill(dt, _vision.DistanceFactor(_player.GlobalPosition));   // resume filling (instant when ~1)
                     if (_meter.Value >= 1f) _state = State.Targeting;
                 }
                 else
@@ -199,52 +193,6 @@ public partial class Guard : CharacterBody3D
     {
         _state = State.Searching;
         _searchTimer = 0f;
-    }
-
-    // Proximity multiplier for detection speed: 1 at the guard, down to a 0.15 floor at max range.
-    private float DistanceFactor()
-    {
-        float d = _eyes.GlobalPosition.DistanceTo(_player.GlobalPosition);
-        return Mathf.Clamp(1f - d / ViewDistance, 0.15f, 1f);
-    }
-
-    // TODO (perf - revisit when spawning many guards): throttle this vision check instead of
-    // running it every physics frame.
-    //   What: today _PhysicsProcess -> UpdatePerception calls CanSeePlayer() ~60x/sec, and each
-    //   call fires up to 3 raycasts (one per body sample) = ~180 server raycasts/sec PER guard.
-    //   Why: individually these server-side raycasts are cheap, but they add up fast with many
-    //   guards. The standard guidance is to run perception on a Timer at ~0.1-0.2s intervals.
-    //   How (so behavior stays identical): integrate the detection meter over the ACTUAL elapsed
-    //   interval (not the per-frame delta), and consider keeping TurnBodyToward() per-frame for smooth
-    //   tracking. Left per-frame for now: a single guard is cheap and per-frame gives the smoothest facing.
-    //   Refs: Godot ray-casting docs - https://docs.godotengine.org/en/stable/tutorials/physics/ray-casting.html
-    //         Stealth FOV guide (recommends a 0.1-0.2s Timer) - https://uhiyama-lab.com/en/notes/godot/stealth-fov-system/
-    //
-    // True if the player is currently visible: within range, inside the view cone, and with a clear
-    // line of sight - tested against several points on the player's body.
-    private bool CanSeePlayer()
-    {
-        if (_player == null) return false;
-
-        var space = GetWorld3D().DirectSpaceState;    // physics world used for raycasts
-        Vector3 forward = -_eyes.GlobalTransform.Basis.Z;   // guard's forward direction (Godot faces -Z)
-
-        foreach (Vector3 offset in SamplePoints)
-        {
-            Vector3 target = _player.GlobalPosition + offset;   // a point on the player's body
-            Vector3 toTarget = target - _eyes.GlobalPosition;   // eyes -> that point
-
-            if (toTarget.Length() > ViewDistance) continue;                          // 1. out of range
-            if (forward.AngleTo(toTarget) > Mathf.DegToRad(ViewAngleDeg)) continue;   // 2. outside FOV cone
-
-            // 3. Line of sight: cast a ray from the eyes to the point, ignoring our own body.
-            var q = PhysicsRayQueryParameters3D.Create(_eyes.GlobalPosition, target);
-            q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            var hit = space.IntersectRay(q);
-            if (hit.Count > 0 && (Node)hit["collider"] == _player)
-                return true;   // this point is clearly visible -> the player is seen
-        }
-        return false;
     }
 
     // SEAM (Mover): the navmesh steering here could become a reusable Mover node/scene shared by
@@ -339,18 +287,18 @@ public partial class Guard : CharacterBody3D
     }
 
     // Smoothly eases the body's yaw toward a world point (horizontal only, no tilt).
+    // InterpolateWith blends rotation robustly (it re-normalizes internally), and since both
+    // transforms share our origin, position is untouched.
     private void TurnBodyToward(Vector3 worldPos, float dt)
     {
         worldPos.Y = GlobalPosition.Y;                        // level: turn, don't tilt
         if (worldPos.IsEqualApprox(GlobalPosition)) return;   // nothing to face -> skip
-        Basis desired = GlobalTransform.LookingAt(worldPos, Vector3.Up).Basis;
-        float t = EaseFactor(BodyTurnRate, dt);
-        Basis blended = GlobalTransform.Basis.Orthonormalized().Slerp(desired.Orthonormalized(), t);
-        GlobalTransform = new Transform3D(blended, GlobalPosition);
+        Transform3D facing = GlobalTransform.LookingAt(worldPos, Vector3.Up);
+        GlobalTransform = GlobalTransform.InterpolateWith(facing, EaseFactor(BodyTurnRate, dt));
     }
 
-    // The single "where is the guard attending" source, shared by the cone (UpdateGaze) and the head.
-    // null means "no specific point" (patrol / scanning) -> callers fall back to their default.
+    // "Where is the guard attending" for the visual head-tracking (UpdateHeadTracking).
+    // null means "no specific point" (patrol / scanning) -> the head is handed back to the clip.
     private Vector3? LookPoint()
     {
         if (_state == State.Targeting && _player != null) return _player.GlobalPosition;  // live player
@@ -397,43 +345,32 @@ public partial class Guard : CharacterBody3D
         return (-GlobalTransform.Basis.Z).AngleTo(to);
     }
 
-    // Single owner of the gaze sensor's orientation. Chooses a target each frame and eases toward it:
-    //  - scanning  -> follow the animated head bone (immersive, matches the mocap)
-    //  - targeting -> code-aim at the live player position (deterministic)
-    //  - otherwise -> aligned with the body's facing
+    // States where the cone should ride the head's FULL 3D aim (pitch included) so it can track a
+    // target up stairs / a ladder. Both are bob-safe: scanning only runs while standing still (no
+    // walk cycle), and while Targeting the head look-at is ramped to full influence, overriding the
+    // walk clip's head bob. Every other state stays yaw-only (see UpdateGaze).
+    private bool TrackVertically => _scanning || _state == State.Targeting;
+
+    // Points the vision sensor along the head's aim, eased for smoothness. Following the head keeps
+    // the cone in sync with it (scan sweep, player tracking); TrackVertically decides whether pitch
+    // rides along or gets flattened to keep the cone level. The interpolation eases across that
+    // switch, so there's no pop. Both transforms share the sensor's origin, so only rotation changes
+    // and the sensor stays pinned at eye height.
     private void UpdateGaze(float dt)
     {
-        Basis desired;
-        if (_scanning)
-            desired = _headGaze.GlobalTransform.Basis;   // scan: cone rides the animated head
-        else if (LookPoint() is Vector3 look)
-            desired = LookBasisAt(look);                 // aware: aim at the shared look point (player / last-seen)
-        else
-            desired = GlobalTransform.Basis;             // else: aligned with the body's facing
+        Vector3 forward = -_headGaze.GlobalBasis.Z;   // head's look direction (Godot faces -Z)
+        if (!TrackVertically) forward.Y = 0f;         // yaw-only: flatten to level -> kills walk-cycle bob
+        if (forward.IsZeroApprox()) return;           // no usable direction -> keep last aim
 
-        float t = EaseFactor(GazeBlendRate, dt);
-
-        // Slerp converts each basis to a quaternion internally, which REQUIRES normalized
-        // (scale-free) bases. Bone/body/look-at bases can carry scale or float drift, so clean
-        // BOTH operands first.
-        Basis from = _eyes.GlobalTransform.Basis.Orthonormalized();
-        Basis to = desired.Orthonormalized();
-        _eyes.GlobalTransform = new Transform3D(from.Slerp(to, t), _eyes.GlobalPosition);
-    }
-
-    // Builds a yaw-only orientation that looks from the eyes toward a world point.
-    private Basis LookBasisAt(Vector3 worldPos)
-    {
-        worldPos.Y = _eyes.GlobalPosition.Y;                             // flatten so we don't tilt up/down
-        if (worldPos.IsEqualApprox(_eyes.GlobalPosition)) return _eyes.GlobalTransform.Basis;
-        return _eyes.GlobalTransform.LookingAt(worldPos, Vector3.Up).Basis;
+        Transform3D aim = _vision.GlobalTransform.LookingAt(_vision.GlobalPosition + forward, Vector3.Up);
+        _vision.GlobalTransform = _vision.GlobalTransform.InterpolateWith(aim, EaseFactor(GazeBlendRate, dt));
     }
 
     // Updates the debug cone color and the floating state/percent readout.
     private void UpdateDebug()
     {
         Color c = StateColor();
-        _coneMat.AlbedoColor = new Color(c.R, c.G, c.B, 0.01f);   // hue by state, alpha kept faint
+        _vision.SetConeColor(c);                                  // recolor the debug cone by state
         _label.Text = $"{_state} {(int)(_meter.Value * 100f)}%";
         _label.Modulate = c;
     }
@@ -447,33 +384,6 @@ public partial class Guard : CharacterBody3D
         State.Targeting => new Color(1f, 0.15f, 0.05f),
         _ => Colors.White,
     };
-
-    // Builds the translucent debug vision cone in code (so it never clutters the editor), sized from
-    // ViewDistance/ViewAngleDeg (base radius = height * tan(half-angle)) so it matches the detection math.
-    private void BuildVisionCone()
-    {
-        var mesh = new CylinderMesh
-        {
-            TopRadius = 0f,                                                          // zero top -> a cone
-            Height = ViewDistance,
-            BottomRadius = ViewDistance * Mathf.Tan(Mathf.DegToRad(ViewAngleDeg)),   // r = H * tan(theta)
-        };
-        _coneMat = new StandardMaterial3D
-        {
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,    // honor the alpha channel
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,   // flat color, ignore lighting
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,         // visible from both sides
-        };
-        var cone = new MeshInstance3D
-        {
-            Mesh = mesh,
-            MaterialOverride = _coneMat,
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-            RotationDegrees = new Vector3(90f, 0f, 0f),           // tip the cone's axis to point forward (-Z)
-            Position = new Vector3(0f, 0f, -ViewDistance / 2f),   // shift so the apex sits at the eyes
-        };
-        _eyes.AddChild(cone);
-    }
 
     // Builds the billboarded debug label that floats above the guard.
     private void BuildDebugLabel()

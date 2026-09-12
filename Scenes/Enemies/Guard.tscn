@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://br8nb3482d7lh" path="res://Scenes/Enemies/Guard.cs" id="1_vq8yj"]
 [ext_resource type="PackedScene" uid="uid://ci2lxhavdgnrx" path="res://Scenes/Enemies/GuardModel.tscn" id="2_ulaj7"]
+[ext_resource type="Script" uid="uid://d1aeym64ii2v5" path="res://Scenes/Enemies/VisionSensor.cs" id="2_yy6wf"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_b1kcs"]
 radius = 0.4
@@ -39,8 +40,9 @@ avoidance_enabled = true
 height = 1.8
 radius = 0.45
 
-[node name="Eyes" type="Node3D" parent="." unique_id=161188913]
+[node name="VisionSensor" type="Node3D" parent="." unique_id=161188913]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+script = ExtResource("2_yy6wf")
 
 [node name="Nose" type="MeshInstance3D" parent="." unique_id=1907003782]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, -0.5)
