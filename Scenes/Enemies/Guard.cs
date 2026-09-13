@@ -135,7 +135,7 @@ public partial class Guard : CharacterBody3D
         //   now: a couple of guards are cheap and per-frame gives the smoothest tracking.
         //   Refs: Godot ray-casting - https://docs.godotengine.org/en/stable/tutorials/physics/ray-casting.html
         //         Stealth FOV guide (0.1-0.2s Timer) - https://uhiyama-lab.com/en/notes/godot/stealth-fov-system/
-        bool seen = _player != null && _vision.CanSee(_player, GetRid());
+        bool seen = _player != null && _vision.CanSee(_player);
         float dt = (float)delta;                        // seconds elapsed this frame
         if (seen) _lastSeenPos = _player.GlobalPosition;
 
