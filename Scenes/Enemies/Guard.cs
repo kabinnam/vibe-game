@@ -46,15 +46,14 @@ public partial class Guard : CharacterBody3D
     [Export] public float GazeBlendRate { get; set; } = 8f;   // how fast the cone eases toward the head's aim
     [Export] public float BodyTurnRate { get; set; } = 6f;    // how fast the body turns (locomotion facing + re-centering the head)
     [Export] public float NeckLimitDeg { get; set; } = 70f;   // once the target passes this yaw from facing, the body turns to re-center
-    [Export] public float TargetAimHeight { get; set; } = 1.5f;  // head looks this far above the target's origin (player origin = feet).
-                                                                 // TODO: add a LookAnchor node to the player and reference that here instead of defining it on guard.
 
     [ExportGroup("Search")]
     [Export] public float SearchThreshold { get; set; } = 0.5f;  // suspicion above which losing sight triggers a search
     [Export] public float SearchTimeout { get; set; } = 8f;      // give up searching after this many seconds (unreachable safety)
 
     private AwarenessMeter _meter;       // analog awareness in [0, 1]; the FSM below decides when to fill/decay
-    private Vector3 _lastSeenPos;        // where the player was most recently seen (used by Searching)
+    private Vector3 _lastSeenPos;        // where the player was most recently seen: a floor point, used as a nav target
+    private Vector3 _lastSeenLookPos;    // the player's look anchor at that moment: where the head aims while investigating
 
     private int _wp = 0;                 // index of the current patrol waypoint
     private float _scanTimer = 0f;       // progress through the current look-around sweep
@@ -63,7 +62,7 @@ public partial class Guard : CharacterBody3D
 
     private NavigationAgent3D _agent;    // pathfinding component (set in _Ready)
     private VisionSensor _vision;        // reusable perception sensor (cone + line-of-sight); owner points it each frame
-    private Node3D _player;              // cached player reference (found via the "player" group)
+    private PlayerController _player;    // cached player reference (found via the "player" group); its script is the player's API
     private Label3D _label;              // debug readout floating above the guard (StateLabel node in Guard.tscn)
     private GuardRig _rig;               // the model's API: animation state, locomotion blend, head look-at, head aim
     private bool _scanning;              // true while standing and scanning (gaze should ride the head animation)
@@ -74,7 +73,7 @@ public partial class Guard : CharacterBody3D
     {
         _vision = GetNode<VisionSensor>("VisionSensor");
         _rig = GetNode<GuardRig>("GuardModel");
-        _player = GetTree().GetFirstNodeInGroup("player") as Node3D;
+        _player = GetTree().GetFirstNodeInGroup("player") as PlayerController;
         _meter = new AwarenessMeter(DetectRate, DecayRate);
         _gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").As<float>();
         _label = GetNode<Label3D>("StateLabel");   // billboard/font/position are configured in Guard.tscn
@@ -125,7 +124,11 @@ public partial class Guard : CharacterBody3D
         //         Stealth FOV guide (0.1-0.2s Timer) - https://uhiyama-lab.com/en/notes/godot/stealth-fov-system/
         bool seen = _player != null && _vision.CanSee(_player);
         float dt = (float)delta;                        // seconds elapsed this frame
-        if (seen) _lastSeenPos = _player.GlobalPosition;
+        if (seen)
+        {
+            _lastSeenPos = _player.GlobalPosition;            // feet: where to walk to
+            _lastSeenLookPos = _player.LookAnchorPosition;    // upper body: where to look
+        }
 
         switch (_state)
         {
@@ -286,14 +289,13 @@ public partial class Guard : CharacterBody3D
     }
 
     // "Where is the guard attending" for the visual head-tracking (UpdateHeadTracking), as the exact
-    // world point to aim the head at (target origin raised by TargetAimHeight so we look at the
-    // upper body, not the feet). null means "no specific point" (patrol / scanning) -> the head is
-    // handed back to the clip.
+    // world point to aim the head at. The player decides where "look at me" means (its LookAnchor),
+    // so this never assumes the player's shape. null means "no specific point" (patrol / scanning)
+    // -> the head is handed back to the clip.
     private Vector3? LookPoint()
     {
-        Vector3 aimOffset = Vector3.Up * TargetAimHeight;
-        if (_state == State.Targeting && _player != null) return _player.GlobalPosition + aimOffset;  // live player
-        if (_state == State.Suspicious) return _lastSeenPos + aimOffset;                              // the spot being investigated
+        if (_state == State.Targeting && _player != null) return _player.LookAnchorPosition;   // live player
+        if (_state == State.Suspicious) return _lastSeenLookPos;                               // the spot being investigated
         return null;
     }
 
