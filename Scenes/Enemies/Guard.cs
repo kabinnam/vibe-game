@@ -64,7 +64,7 @@ public partial class Guard : CharacterBody3D
     private NavigationAgent3D _agent;    // pathfinding component (set in _Ready)
     private VisionSensor _vision;        // reusable perception sensor (cone + line-of-sight); owner points it each frame
     private Node3D _player;              // cached player reference (found via the "player" group)
-    private Label3D _label;              // debug readout floating above the guard
+    private Label3D _label;              // debug readout floating above the guard (StateLabel node in Guard.tscn)
     private GuardRig _rig;               // the model's API: animation state, locomotion blend, head look-at, head aim
     private bool _scanning;              // true while standing and scanning (gaze should ride the head animation)
     private bool _bodyTurning;           // hysteresis latch: true while the body is re-centering a far target
@@ -77,7 +77,7 @@ public partial class Guard : CharacterBody3D
         _player = GetTree().GetFirstNodeInGroup("player") as Node3D;
         _meter = new AwarenessMeter(DetectRate, DecayRate);
         _gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").As<float>();
-        BuildDebugLabel();
+        _label = GetNode<Label3D>("StateLabel");   // billboard/font/position are configured in Guard.tscn
 
         // The agent's static avoidance settings (avoidance_enabled / radius / height) now live on
         // the NavigationAgent3D node in Guard.tscn (scene = config). Here we only do the code-side
@@ -370,17 +370,4 @@ public partial class Guard : CharacterBody3D
         _ => Colors.White,
     };
 
-    // Builds the billboarded debug label that floats above the guard.
-    private void BuildDebugLabel()
-    {
-        _label = new Label3D
-        {
-            Text = "Patrol 0%",
-            Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,   // always face the camera
-            NoDepthTest = true,                                     // draw on top of geometry
-            FontSize = 48,
-            Position = new Vector3(0f, 2.2f, 0f),                   // float above the guard
-        };
-        AddChild(_label);
-    }
 }
