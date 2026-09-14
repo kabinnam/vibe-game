@@ -8,8 +8,9 @@ namespace VibeGame.Enemies;
 // raycasting, so cover genuinely hides the player. The guard patrols a waypoint loop,
 // investigates, and chases using its NavigationAgent3D (with RVO avoidance).
 //
-// Organization note: this is one cohesive script for a single enemy type. Perception now lives
-// in the reusable VisionSensor node; the remaining "SEAM" comments below mark the next natural
+// Organization note: this is one cohesive script for a single enemy type. Perception lives in the
+// reusable VisionSensor node and everything model-specific (animation, head look-at) behind the
+// GuardRig API on GuardModel.tscn; the remaining "SEAM" comments below mark the next natural
 // pieces to extract (Mover) or a node-based state machine.
 public partial class Guard : CharacterBody3D
 {
@@ -42,10 +43,11 @@ public partial class Guard : CharacterBody3D
     [Export] public float ScanSeconds { get; set; } = 2.0f;  // how long the guard dwells and scans at a waypoint
 
     [ExportGroup("Gaze & Head Tracking")]
-    [Export] public float GazeBlendRate { get; set; } = 8f;   // how fast the cone eases toward the head's yaw
-    [Export] public float HeadTrackRate { get; set; } = 10f;  // how fast the head look eases in/out (visual only)
+    [Export] public float GazeBlendRate { get; set; } = 8f;   // how fast the cone eases toward the head's aim
     [Export] public float BodyTurnRate { get; set; } = 6f;    // how fast the body turns (locomotion facing + re-centering the head)
     [Export] public float NeckLimitDeg { get; set; } = 70f;   // once the target passes this yaw from facing, the body turns to re-center
+    [Export] public float TargetAimHeight { get; set; } = 1.5f;  // head looks this far above the target's origin (player origin = feet).
+                                                                 // TODO: add a LookAnchor node to the player and reference that here instead of defining it on guard.
 
     [ExportGroup("Search")]
     [Export] public float SearchThreshold { get; set; } = 0.5f;  // suspicion above which losing sight triggers a search
@@ -63,25 +65,15 @@ public partial class Guard : CharacterBody3D
     private VisionSensor _vision;        // reusable perception sensor (cone + line-of-sight); owner points it each frame
     private Node3D _player;              // cached player reference (found via the "player" group)
     private Label3D _label;              // debug readout floating above the guard
-    private AnimationTree _animTree;     // drives the model's animation (state machine + locomotion blend)
-    private AnimationNodeStateMachinePlayback _animState;  // handle used to switch between the "Move" and "Scan" states
-    private Node3D _headGaze;            // offset node under the head bone; its -Z is the animated look direction
+    private GuardRig _rig;               // the model's API: animation state, locomotion blend, head look-at, head aim
     private bool _scanning;              // true while standing and scanning (gaze should ride the head animation)
-    private LookAtModifier3D _lookMod;   // WRITES the head bone to look at _lookTarget (visual head tracking)
-    private Node3D _lookTarget;          // world-space point the head aims at (moved to the look point when aware)
     private bool _bodyTurning;           // hysteresis latch: true while the body is re-centering a far target
 
     // Runs once when the guard enters the scene tree (Godot lifecycle).
     public override void _Ready()
     {
         _vision = GetNode<VisionSensor>("VisionSensor");
-        _animTree = GetNode<AnimationTree>("GuardModel/AnimationTree");
-        _animState = _animTree.Get("parameters/playback").As<AnimationNodeStateMachinePlayback>();
-        _headGaze = GetNode<Node3D>("GuardModel/GeneralSkeleton/HeadAttach/HeadGaze");
-        _lookMod = GetNode<LookAtModifier3D>("GuardModel/GeneralSkeleton/LookAtModifier3D");
-        _lookTarget = GetNode<Node3D>("LookTarget");
-        _lookMod.TargetNode = _lookMod.GetPathTo(_lookTarget);   // tell the modifier which node to aim the head at
-        _lookMod.Influence = 0f;                                 // start off; UpdateHeadTracking ramps it when aware
+        _rig = GetNode<GuardRig>("GuardModel");
         _player = GetTree().GetFirstNodeInGroup("player") as Node3D;
         _meter = new AwarenessMeter(DetectRate, DecayRate);
         _gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").As<float>();
@@ -106,17 +98,13 @@ public partial class Guard : CharacterBody3D
         UpdateHeadTracking((float)delta);   // visual head-tracking + body re-center (runs after AI + anim state)
     }
 
-    // Drives the model's animation to match what the AI is already doing (read-only: it observes
-    // state/speed, it never moves the guard). Two parts:
-    //   1. Pick the state-machine state: "Scan" (the look-around) only while standing at a Patrol/
-    //      Search waypoint (_scanning); "Move" otherwise.
-    //   2. Inside "Move", feed horizontal speed into the blend space so it blends stand/walk/jog.
+    // Tells the model what the AI is already doing (read-only: it observes state/speed, it never
+    // moves the guard): scan pose only while standing at a Patrol/Search waypoint (_scanning),
+    // otherwise the locomotion blend driven by horizontal speed.
     private void UpdateLocomotionAnimation()
     {
-        _animState.Travel(_scanning ? "Scan" : "Move");
-
-        float speed = HorizontalSpeed;
-        _animTree.Set("parameters/Move/blend_position", speed);   // 0 -> stand idle, ~1.5 -> walk, ~3.5 -> jog
+        _rig.SetScanning(_scanning);
+        _rig.SetMoveSpeed(HorizontalSpeed);
     }
 
     // Advances the awareness meter and state machine. Detection ramps up gradually; the meter value
@@ -297,43 +285,40 @@ public partial class Guard : CharacterBody3D
         GlobalTransform = GlobalTransform.InterpolateWith(facing, EaseFactor(BodyTurnRate, dt));
     }
 
-    // "Where is the guard attending" for the visual head-tracking (UpdateHeadTracking).
-    // null means "no specific point" (patrol / scanning) -> the head is handed back to the clip.
+    // "Where is the guard attending" for the visual head-tracking (UpdateHeadTracking), as the exact
+    // world point to aim the head at (target origin raised by TargetAimHeight so we look at the
+    // upper body, not the feet). null means "no specific point" (patrol / scanning) -> the head is
+    // handed back to the clip.
     private Vector3? LookPoint()
     {
-        if (_state == State.Targeting && _player != null) return _player.GlobalPosition;  // live player
-        if (_state == State.Suspicious) return _lastSeenPos;                              // the spot being investigated
+        Vector3 aimOffset = Vector3.Up * TargetAimHeight;
+        if (_state == State.Targeting && _player != null) return _player.GlobalPosition + aimOffset;  // live player
+        if (_state == State.Suspicious) return _lastSeenPos + aimOffset;                              // the spot being investigated
         return null;
     }
 
-    // Visual head-tracking. The LookAtModifier WRITES the head bone to look at _lookTarget; the cone
-    // and detection are unaffected (they stay code-owned). While aware: aim the head at the look point
-    // and ease the modifier in. If the target passes the neck limit while the guard is standing still,
-    // turn the body to re-center it - with hysteresis so it doesn't shuffle-step at the edge.
+    // Visual head-tracking. The rig aims the head at the look point (or hands it back to the clip
+    // when there is none); the cone and detection are unaffected (they stay code-owned). If the
+    // target passes the neck limit while the guard is standing still, turn the body to re-center
+    // it - with hysteresis so it doesn't shuffle-step at the edge.
     private void UpdateHeadTracking(float dt)
     {
-        float ease = EaseFactor(HeadTrackRate, dt);
+        Vector3? lookPoint = LookPoint();
+        _rig.SetHeadTarget(lookPoint, dt);
 
-        if (LookPoint() is Vector3 point)
+        if (lookPoint is not Vector3 point)
         {
-            Vector3 aim = point;
-            aim.Y += 1.5f;                                    // aim at head/upper body, not the feet
-            _lookTarget.GlobalPosition = aim;
-            _lookMod.Influence = Mathf.Lerp(_lookMod.Influence, 1f, ease);
+            _bodyTurning = false;   // not aware -> nothing to re-center on
+            return;
+        }
 
-            // Re-center only while essentially stopped; when moving, MoveTo already faces the body toward travel.
-            bool stationary = HorizontalSpeed < 0.3f;
-            float yawDeg = Mathf.RadToDeg(FlatAngleTo(point));
-            if (!stationary) _bodyTurning = false;
-            else if (yawDeg > NeckLimitDeg) _bodyTurning = true;             // target past the neck -> start turning
-            else if (yawDeg < NeckLimitDeg * 0.5f) _bodyTurning = false;     // comfortably in front -> stop (hysteresis)
-            if (_bodyTurning) TurnBodyToward(point, dt);
-        }
-        else
-        {
-            _lookMod.Influence = Mathf.Lerp(_lookMod.Influence, 0f, ease);   // not aware -> hand the head back to the clip
-            _bodyTurning = false;
-        }
+        // Re-center only while essentially stopped; when moving, MoveTo already faces the body toward travel.
+        bool stationary = HorizontalSpeed < 0.3f;
+        float yawDeg = Mathf.RadToDeg(FlatAngleTo(point));
+        if (!stationary) _bodyTurning = false;
+        else if (yawDeg > NeckLimitDeg) _bodyTurning = true;             // target past the neck -> start turning
+        else if (yawDeg < NeckLimitDeg * 0.5f) _bodyTurning = false;     // comfortably in front -> stop (hysteresis)
+        if (_bodyTurning) TurnBodyToward(point, dt);
     }
 
     // Yaw angle (radians) between the guard's forward (-Z) and the flattened direction to a world point.
@@ -358,7 +343,7 @@ public partial class Guard : CharacterBody3D
     // and the sensor stays pinned at eye height.
     private void UpdateGaze(float dt)
     {
-        Vector3 forward = -_headGaze.GlobalBasis.Z;   // head's look direction (Godot faces -Z)
+        Vector3 forward = _rig.HeadForward;            // where the animated head is looking
         if (!TrackVertically) forward.Y = 0f;         // yaw-only: flatten to level -> kills walk-cycle bob
         if (forward.IsZeroApprox()) return;           // no usable direction -> keep last aim
 

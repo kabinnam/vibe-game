@@ -5,6 +5,7 @@
 [ext_resource type="AnimationLibrary" uid="uid://vwvd2adnxquv" path="res://Assets/Animations/Jogging.fbx" id="3_3502g"]
 [ext_resource type="AnimationLibrary" uid="uid://77166bvgmsug" path="res://Assets/Animations/StandIdle.fbx" id="4_3502g"]
 [ext_resource type="AnimationLibrary" uid="uid://pbmmwf86dfit" path="res://Assets/Animations/Walking.fbx" id="4_wdh1s"]
+[ext_resource type="Script" uid="uid://c5vgq2rkm8ehd" path="res://Scenes/Enemies/GuardRig.cs" id="5_rig"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ulaj7"]
 albedo_color = Color(1, 1, 0, 1)
@@ -54,6 +55,7 @@ transitions = ["Start", "Move", SubResource("AnimationNodeStateMachineTransition
 graph_offset = Vector2(207.63524, 0)
 
 [node name="YBot" unique_id=1171025121 instance=ExtResource("1_0piwi")]
+script = ExtResource("5_rig")
 
 [node name="GeneralSkeleton" parent="." index="0" unique_id=616946334]
 bones/0/position = Vector3(0.002837991, 0.93203074, -0.0030423433)
@@ -109,9 +111,12 @@ bone_name = "Head"
 bone_idx = 5
 
 [node name="HeadGaze" type="Node3D" parent="GeneralSkeleton/HeadAttach" index="0" unique_id=1078250331]
+unique_name_in_owner = true
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
 [node name="LookAtModifier3D" type="LookAtModifier3D" parent="GeneralSkeleton" index="3" unique_id=1875874485]
+unique_name_in_owner = true
+target_node = NodePath("../../LookTarget")
 bone_name = "Head"
 bone = 5
 use_angle_limitation = true
@@ -128,6 +133,10 @@ libraries/StandIdle = ExtResource("4_3502g")
 libraries/Walking = ExtResource("4_wdh1s")
 
 [node name="AnimationTree" type="AnimationTree" parent="." index="2" unique_id=1368347642]
+unique_name_in_owner = true
 tree_root = SubResource("AnimationNodeStateMachine_0c0r4")
 anim_player = NodePath("../AnimationPlayer")
 parameters/Move/blend_position = 0.0
+
+[node name="LookTarget" type="Node3D" parent="." index="3"]
+unique_name_in_owner = true
