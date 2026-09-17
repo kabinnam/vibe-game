@@ -37,6 +37,7 @@ public partial class Guard : CharacterBody3D
     [Export] public float SuspiciousSpeed { get; set; } = 1f;  // creep speed while investigating
     [Export] public float ChaseSpeed { get; set; } = 3.5f;     // pursuit speed
     [Export] public float SearchSpeed { get; set; } = 3f;      // travel speed to the last-seen spot
+    [Export] public float ArriveSlack { get; set; } = 0.5f;    // once arrived, the target must drift this far past the agent's arrival distance before we move again
 
     [ExportGroup("Patrol")]
     [Export] public Godot.Collections.Array<Marker3D> Waypoints { get; set; } = new();  // per-guard patrol route (order matters)
@@ -73,6 +74,7 @@ public partial class Guard : CharacterBody3D
     private GuardRig _rig;               // the model's API: animation state, locomotion blend, head look-at, head aim
     private bool _scanning;              // true while standing and scanning (gaze should ride the head animation)
     private bool _bodyTurning;           // hysteresis latch: true while the body is re-centering a far target
+    private bool _arrived;               // hysteresis latch: true from reaching the nav target until it drifts ArriveSlack past arrival distance
 
     // Runs once when the guard enters the scene tree (Godot lifecycle).
     public override void _Ready()
@@ -178,7 +180,7 @@ public partial class Guard : CharacterBody3D
                 else
                 {
                     _searchTimer += dt;
-                    if (_agent.IsNavigationFinished())                  // only decay once we've reached the spot
+                    if (_arrived)                                       // only decay once we've reached the spot
                         _meter.Decay(dt);
                     if (_meter.Value <= 0f || _searchTimer >= SearchTimeout)
                         _state = State.Patrol;                          // give up: found nothing, or timed out
@@ -228,31 +230,34 @@ public partial class Guard : CharacterBody3D
     // Search ignores it and lets the awareness decay end the search.
     private bool GoToAndScan(Vector3 target, float speed)
     {
-        _agent.TargetPosition = target;
-        if (_agent.IsNavigationFinished())
-        {
-            StandStill();
-            _scanning = true;
-            return Scan();
-        }
-        MoveTo(target, speed);
-        return false;
+        if (!MoveTo(target, speed)) return false;   // still traveling
+        _scanning = true;
+        return Scan();
     }
 
-    // Steers the guard toward a target across the navmesh, feeding a desired velocity to avoidance.
-    private void MoveTo(Vector3 targetPos, float speed)
+    // Steers the guard toward a target across the navmesh (feeding a desired velocity to avoidance)
+    // and reports whether we're there. Arrival has hysteresis: the agent's IsNavigationFinished is a
+    // hard threshold at TargetDesiredDistance, which flaps every frame when the target hovers at that
+    // edge (a player strafing beside a parked guard) - one frame of 3.5 m/s, one frame of 0, and the
+    // locomotion blend stutters idle/jog. So once arrived we stay arrived until the target has clearly
+    // moved away (ArriveSlack beyond the arrival distance).
+    private bool MoveTo(Vector3 target, float speed)
     {
-        _agent.TargetPosition = targetPos;
-        if (_agent.IsNavigationFinished())
+        _agent.TargetPosition = target;
+        if (_agent.IsNavigationFinished()) _arrived = true;
+        else if (_agent.DistanceToTarget() > _agent.TargetDesiredDistance + ArriveSlack) _arrived = false;
+        if (_arrived)
         {
             StandStill();   // arrived: request stop (gravity is still applied in OnVelocityComputed)
-            return;
+            return true;
         }
+
         Vector3 dir = _agent.GetNextPathPosition() - GlobalPosition;  // toward the next point on the path
         dir.Y = 0;                                                    // horizontal only; gravity handles vertical
         dir = dir.Normalized();
         TurnBodyToward(GlobalPosition + dir, (float)GetPhysicsProcessDeltaTime());   // face the travel direction
         _agent.Velocity = dir * speed;                                // desired velocity -> triggers OnVelocityComputed
+        return false;
     }
 
     // Requests zero horizontal velocity. Still routed through the agent so gravity/MoveAndSlide
@@ -396,7 +401,7 @@ public partial class Guard : CharacterBody3D
         float coneErr = Mathf.RadToDeg((-_vision.GlobalBasis.Z).AngleTo(toFromCone));
         float headErr = Mathf.RadToDeg(_rig.HeadForward.AngleTo(toFromCone));
         float dist = GlobalPosition.DistanceTo(_player.GlobalPosition);
-        return $"cone {coneErr,3:F0} head {headErr,3:F0} d {dist:F2} v {HorizontalSpeed:F1} nav {(_agent.IsNavigationFinished() ? "stop" : "go")}";
+        return $"cone {coneErr,3:F0} head {headErr,3:F0} d {dist:F2} v {HorizontalSpeed:F1} nav {(_arrived ? "stop" : "go")}";
     }
     // ---- end DIAG ----
 
