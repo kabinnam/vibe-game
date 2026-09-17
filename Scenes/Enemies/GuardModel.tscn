@@ -116,7 +116,6 @@ transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0
 
 [node name="LookAtModifier3D" type="LookAtModifier3D" parent="GeneralSkeleton" index="3" unique_id=1875874485]
 unique_name_in_owner = true
-target_node = NodePath("../../LookTarget")
 bone_name = "Head"
 bone = 5
 use_angle_limitation = true
@@ -125,6 +124,7 @@ primary_limit_angle = 2.443461
 primary_damp_threshold = 1.0
 secondary_limit_angle = 6.2831855
 secondary_damp_threshold = 1.0
+duration = 0.25
 
 [node name="AnimationPlayer" parent="." index="1" unique_id=158963745]
 libraries/IdleScanning = ExtResource("2_lbak6")
@@ -139,5 +139,5 @@ tree_root = SubResource("AnimationNodeStateMachine_0c0r4")
 anim_player = NodePath("../AnimationPlayer")
 parameters/Move/blend_position = 0.0
 
-[node name="LookTarget" type="Node3D" parent="." index="3" unique_id=1972942302]
+[node name="AttentionMarker" type="Marker3D" parent="." index="3" unique_id=1972942302]
 unique_name_in_owner = true

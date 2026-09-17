@@ -312,7 +312,7 @@ public partial class Guard : CharacterBody3D
     private void UpdateAttention(float dt)
     {
         Vector3? point = LookPoint();
-        _rig.SetHeadTarget(point, dt);
+        _rig.SetHeadTarget(point);
         ReCenterBody(point, dt);
         AimSensor(tracking: point.HasValue, dt);
     }
@@ -349,8 +349,8 @@ public partial class Guard : CharacterBody3D
 
     // States where the cone should ride the head's FULL 3D aim (pitch included) so it can track a
     // target up stairs / a ladder. Both are bob-safe: scanning only runs while standing still (no
-    // walk cycle), and while Targeting the head look-at is ramped to full influence, overriding the
-    // walk clip's head bob. Every other state stays yaw-only (see AimSensor).
+    // walk cycle), and while Targeting the look-at owns the head, overriding the walk clip's head
+    // bob. Every other state stays yaw-only (see AimSensor).
     private bool TrackVertically => _scanning || _state == State.Targeting;
 
     // Points the vision sensor along the head's aim; the head is the authoritative "where is the guard
