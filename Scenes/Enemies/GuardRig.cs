@@ -41,6 +41,11 @@ public partial class GuardRig : Node3D
     // Where the animated head is looking, in world space. Owners aim sensors with this.
     public Vector3 HeadForward => -_headGaze.GlobalBasis.Z;   // Godot faces -Z
 
+    // How far (degrees, per side) the head can yaw before the look-at clamps it. Single source of
+    // truth is the LookAtModifier3D's primary_limit_angle in GuardModel.tscn; with symmetry_limitation
+    // on, the engine treats that value as a TOTAL arc split evenly left/right, hence the halving.
+    public float HeadYawLimitDeg => Mathf.RadToDeg(_lookMod.PrimaryLimitAngle) * 0.5f;
+
     // Feeds horizontal speed into the locomotion blend space: 0 -> stand, ~1.5 -> walk, ~3.5 -> jog.
     public void SetMoveSpeed(float speed) => _animTree.Set(MoveBlendParam, speed);
 

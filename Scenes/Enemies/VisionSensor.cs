@@ -4,7 +4,7 @@ namespace VibeGame.Enemies;
 
 // A reusable vision sensor: given where it is pointed, it answers "can I see this target?"
 // It owns the view cone + line-of-sight raycasting and knows nothing about WHO is looking or
-// WHERE to look - the owner points it each frame (see Guard.UpdateGaze). Drop it on any NPC,
+// WHERE to look - the owner points it each frame (see Guard.AimSensor). Drop it on any NPC,
 // camera, or turret that needs sight.
 [GlobalClass]
 public partial class VisionSensor : Node3D

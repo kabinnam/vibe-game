@@ -42,10 +42,16 @@ public partial class Guard : CharacterBody3D
     [Export] public Godot.Collections.Array<Marker3D> Waypoints { get; set; } = new();  // per-guard patrol route (order matters)
     [Export] public float ScanSeconds { get; set; } = 2.0f;  // how long the guard dwells and scans at a waypoint
 
-    [ExportGroup("Gaze & Head Tracking")]
-    [Export] public float GazeBlendRate { get; set; } = 8f;   // how fast the cone eases toward the head's aim
-    [Export] public float BodyTurnRate { get; set; } = 6f;    // how fast the body turns (locomotion facing + re-centering the head)
-    [Export] public float NeckLimitDeg { get; set; } = 70f;   // once the target passes this yaw from facing, the body turns to re-center
+    // Everything here hangs off ONE fact per frame: is the guard attending to a point (LookPoint() != null)?
+    // If so the look-at owns the head and the body/sensor follow it exactly; if not the clip owns the head.
+    [ExportGroup("Attention")]
+    [Export] public float BodyTurnRate { get; set; } = 6f;    // how fast the body yaws (travel facing + re-centering the head)
+    // Body re-centering thresholds as FRACTIONS of the head's reach (GuardRig.HeadYawLimitDeg, from the
+    // LookAtModifier3D limit in GuardModel.tscn), so they can't drift from it. Start < 1: the body begins
+    // helping while the head still has reach, so the head never pins short of the target.
+    [Export(PropertyHint.Range, "0,1")] public float BodyTurnStartFraction { get; set; } = 0.65f;   // start turning past this share of head reach
+    [Export(PropertyHint.Range, "0,1")] public float BodyTurnStopFraction { get; set; } = 0.2f;     // stop once within this share (hysteresis)
+    [Export] public float GazeSmoothRate { get; set; } = 8f;  // sensor low-pass on the walk cycle's head sway; ONLY while no point is tracked
 
     [ExportGroup("Search")]
     [Export] public float SearchThreshold { get; set; } = 0.5f;  // suspicion above which losing sight triggers a search
@@ -91,10 +97,9 @@ public partial class Guard : CharacterBody3D
     {
         UpdatePerception(delta);
         ApplyBehavior();
-        UpdateGaze((float)delta);
-        UpdateDebug();
         UpdateLocomotionAnimation();
-        UpdateHeadTracking((float)delta);   // visual head-tracking + body re-center (runs after AI + anim state)
+        UpdateAttention((float)delta);      // head -> body re-center -> sensor, all from one look point (after AI + anim state)
+        UpdateDebug();
     }
 
     // Tells the model what the AI is already doing (read-only: it observes state/speed, it never
@@ -157,7 +162,11 @@ public partial class Guard : CharacterBody3D
             case State.Targeting:
                 // Fully alerted; drops to a search the moment line of sight is lost.
                 _meter.Pin();
-                if (!seen) EnterSearching();
+                if (!seen)
+                {
+                    GD.Print($"[Guard DIAG] lost sight: {DiagLine()}");   // DIAG (temporary)
+                    EnterSearching();
+                }
                 break;
 
             case State.Searching:
@@ -288,10 +297,9 @@ public partial class Guard : CharacterBody3D
         GlobalTransform = GlobalTransform.InterpolateWith(facing, EaseFactor(BodyTurnRate, dt));
     }
 
-    // "Where is the guard attending" for the visual head-tracking (UpdateHeadTracking), as the exact
-    // world point to aim the head at. The player decides where "look at me" means (its LookAnchor),
-    // so this never assumes the player's shape. null means "no specific point" (patrol / scanning)
-    // -> the head is handed back to the clip.
+    // "Where is the guard attending", as the exact world point to aim the head at. The player decides
+    // where "look at me" means (its LookAnchor), so this never assumes the player's shape. null means
+    // "no specific point" (patrol / scanning) -> the head is handed back to the clip.
     private Vector3? LookPoint()
     {
         if (_state == State.Targeting && _player != null) return _player.LookAnchorPosition;   // live player
@@ -299,15 +307,22 @@ public partial class Guard : CharacterBody3D
         return null;
     }
 
-    // Visual head-tracking. The rig aims the head at the look point (or hands it back to the clip
-    // when there is none); the cone and detection are unaffected (they stay code-owned). If the
-    // target passes the neck limit while the guard is standing still, turn the body to re-center
-    // it - with hysteresis so it doesn't shuffle-step at the edge.
-    private void UpdateHeadTracking(float dt)
+    // Everything downstream of the guard's attention this frame, in dependency order: aim the head,
+    // re-center the body if the head is running out of reach, then align the sensor to wherever the
+    // head ended up. The look point is computed once so the three can't disagree.
+    private void UpdateAttention(float dt)
     {
-        Vector3? lookPoint = LookPoint();
-        _rig.SetHeadTarget(lookPoint, dt);
+        Vector3? point = LookPoint();
+        _rig.SetHeadTarget(point, dt);
+        ReCenterBody(point, dt);
+        AimSensor(tracking: point.HasValue, dt);
+    }
 
+    // While standing still, the body shares the turn: it starts re-centering as the head NEARS its
+    // reach and continues until the target is nearly centered (hysteresis, so no shuffle-step at the
+    // edge). Visual only: the cone and detection are unaffected (they stay code-owned).
+    private void ReCenterBody(Vector3? lookPoint, float dt)
+    {
         if (lookPoint is not Vector3 point)
         {
             _bodyTurning = false;   // not aware -> nothing to re-center on
@@ -316,10 +331,11 @@ public partial class Guard : CharacterBody3D
 
         // Re-center only while essentially stopped; when moving, MoveTo already faces the body toward travel.
         bool stationary = HorizontalSpeed < 0.3f;
-        float yawDeg = Mathf.RadToDeg(FlatAngleTo(point));
+        float targetYawDeg = Mathf.RadToDeg(FlatAngleTo(point));   // how far off body-forward the target is
+        float headReachDeg = _rig.HeadYawLimitDeg;                 // how far the head alone can turn
         if (!stationary) _bodyTurning = false;
-        else if (yawDeg > NeckLimitDeg) _bodyTurning = true;             // target past the neck -> start turning
-        else if (yawDeg < NeckLimitDeg * 0.5f) _bodyTurning = false;     // comfortably in front -> stop (hysteresis)
+        else if (targetYawDeg > headReachDeg * BodyTurnStartFraction) _bodyTurning = true;    // head nearing its reach -> body helps
+        else if (targetYawDeg < headReachDeg * BodyTurnStopFraction) _bodyTurning = false;    // re-centered -> stop
         if (_bodyTurning) TurnBodyToward(point, dt);
     }
 
@@ -335,22 +351,28 @@ public partial class Guard : CharacterBody3D
     // States where the cone should ride the head's FULL 3D aim (pitch included) so it can track a
     // target up stairs / a ladder. Both are bob-safe: scanning only runs while standing still (no
     // walk cycle), and while Targeting the head look-at is ramped to full influence, overriding the
-    // walk clip's head bob. Every other state stays yaw-only (see UpdateGaze).
+    // walk clip's head bob. Every other state stays yaw-only (see AimSensor).
     private bool TrackVertically => _scanning || _state == State.Targeting;
 
-    // Points the vision sensor along the head's aim, eased for smoothness. Following the head keeps
-    // the cone in sync with it (scan sweep, player tracking); TrackVertically decides whether pitch
-    // rides along or gets flattened to keep the cone level. The interpolation eases across that
-    // switch, so there's no pop. Both transforms share the sensor's origin, so only rotation changes
-    // and the sensor stays pinned at eye height.
-    private void UpdateGaze(float dt)
+    // Points the vision sensor along the head's aim; the head is the authoritative "where is the guard
+    // looking". Who owns the head decides how:
+    //  - tracking a point: the cone must EQUAL the head. No easing - the sensor is a child of the body,
+    //    so any lag lets a body turn carry the cone off the target (cone swinging past the head on
+    //    direction reversals; lost sight).
+    //  - clip owns the head (patrol, scan): ease, purely to low-pass the walk cycle's head sway. There
+    //    is no target to lose, so lag costs nothing here.
+    // TrackVertically decides whether pitch rides along or is flattened to keep the cone level. Only
+    // rotation changes; the sensor stays pinned at eye height.
+    private void AimSensor(bool tracking, float dt)
     {
-        Vector3 forward = _rig.HeadForward;            // where the animated head is looking
+        Vector3 forward = _rig.HeadForward;            // where the head is looking
         if (!TrackVertically) forward.Y = 0f;         // yaw-only: flatten to level -> kills walk-cycle bob
         if (forward.IsZeroApprox()) return;           // no usable direction -> keep last aim
 
         Transform3D aim = _vision.GlobalTransform.LookingAt(_vision.GlobalPosition + forward, Vector3.Up);
-        _vision.GlobalTransform = _vision.GlobalTransform.InterpolateWith(aim, EaseFactor(GazeBlendRate, dt));
+        _vision.GlobalTransform = tracking
+            ? aim
+            : _vision.GlobalTransform.InterpolateWith(aim, EaseFactor(GazeSmoothRate, dt));
     }
 
     // Updates the debug cone color and the floating state/percent readout.
@@ -358,9 +380,25 @@ public partial class Guard : CharacterBody3D
     {
         Color c = StateColor();
         _vision.SetConeColor(c);                                  // recolor the debug cone by state
-        _label.Text = $"{_state} {(int)(_meter.Value * 100f)}%";
+        _label.Text = $"{_state} {(int)(_meter.Value * 100f)}%\n{DiagLine()}";   // DIAG (temporary second line)
         _label.Modulate = c;
     }
+
+    // ---- DIAG (temporary): cone/head sync + arrival investigation. Remove when resolved. ----
+    // cone = angle between the vision sensor's forward and the direction to the player's look anchor
+    // head = same angle for the head's forward (what the cone is easing toward)
+    // d    = distance to the player;  v = horizontal speed;  nav = IsNavigationFinished
+    private string DiagLine()
+    {
+        if (_player == null) return "no player";
+        Vector3 anchor = _player.LookAnchorPosition;
+        Vector3 toFromCone = anchor - _vision.GlobalPosition;
+        float coneErr = Mathf.RadToDeg((-_vision.GlobalBasis.Z).AngleTo(toFromCone));
+        float headErr = Mathf.RadToDeg(_rig.HeadForward.AngleTo(toFromCone));
+        float dist = GlobalPosition.DistanceTo(_player.GlobalPosition);
+        return $"cone {coneErr,3:F0} head {headErr,3:F0} d {dist:F2} v {HorizontalSpeed:F1} nav {(_agent.IsNavigationFinished() ? "stop" : "go")}";
+    }
+    // ---- end DIAG ----
 
     // Debug color per awareness state (green -> yellow -> orange -> red).
     private Color StateColor() => _state switch
