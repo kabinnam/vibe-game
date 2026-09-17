@@ -97,18 +97,10 @@ public partial class Guard : CharacterBody3D
     {
         UpdatePerception(delta);
         ApplyBehavior();
-        UpdateLocomotionAnimation();
+        _rig.SetScanning(_scanning);        // tell the model what the AI decided: scan pose or locomotion blend
+        _rig.SetMoveSpeed(HorizontalSpeed);
         UpdateAttention((float)delta);      // head -> body re-center -> sensor, all from one look point (after AI + anim state)
         UpdateDebug();
-    }
-
-    // Tells the model what the AI is already doing (read-only: it observes state/speed, it never
-    // moves the guard): scan pose only while standing at a Patrol/Search waypoint (_scanning),
-    // otherwise the locomotion blend driven by horizontal speed.
-    private void UpdateLocomotionAnimation()
-    {
-        _rig.SetScanning(_scanning);
-        _rig.SetMoveSpeed(HorizontalSpeed);
     }
 
     // Advances the awareness meter and state machine. Detection ramps up gradually; the meter value
@@ -219,14 +211,17 @@ public partial class Guard : CharacterBody3D
         }
     }
 
-    // Travels to a world target across the navmesh; on arrival, stands and scans in place.
-    // Returns true when a full scan interval completes: Patrol uses that to advance its waypoint;
-    // Search ignores it and lets the awareness decay end the search.
+    // Travels to a world target across the navmesh; on arrival, stands and scans in place (the visible
+    // look-around comes from the IdleScanning clip). Returns true once a full scan interval completes:
+    // Patrol uses that to advance its waypoint; Search ignores it and lets the awareness decay end the search.
     private bool GoToAndScan(Vector3 target, float speed)
     {
         if (!MoveTo(target, speed)) return false;   // still traveling
         _scanning = true;
-        return Scan();
+        _scanTimer += (float)GetPhysicsProcessDeltaTime();
+        if (_scanTimer < ScanSeconds) return false;
+        _scanTimer = 0f;
+        return true;
     }
 
     // Steers the guard toward a target across the navmesh (feeding a desired velocity to avoidance)
@@ -273,16 +268,6 @@ public partial class Guard : CharacterBody3D
         v += GetGravity() * (float)GetPhysicsProcessDeltaTime();   // keep the guard on the floor (project gravity + any Area3D override)
         Velocity = v;
         MoveAndSlide();                                        // the ONE place we move (avoidance is on)
-    }
-
-    // Times how long the guard has been standing and scanning. Returns true once a full
-    // scan interval has elapsed. The visible look-around + cone motion now come from the
-    // IdleScanning animation (via the head bone), so this no longer moves the gaze itself.
-    private bool Scan()
-    {
-        _scanTimer += (float)GetPhysicsProcessDeltaTime();
-        if (_scanTimer >= ScanSeconds) { _scanTimer = 0f; return true; }
-        return false;
     }
 
     // Smoothly eases the body's yaw toward a world point (horizontal only, no tilt).
@@ -347,12 +332,6 @@ public partial class Guard : CharacterBody3D
         return (-GlobalTransform.Basis.Z).AngleTo(to);
     }
 
-    // States where the cone should ride the head's FULL 3D aim (pitch included) so it can track a
-    // target up stairs / a ladder. Both are bob-safe: scanning only runs while standing still (no
-    // walk cycle), and while Targeting the look-at owns the head, overriding the walk clip's head
-    // bob. Every other state stays yaw-only (see AimSensor).
-    private bool TrackVertically => _scanning || _state == State.Targeting;
-
     // Points the vision sensor along the head's aim; the head is the authoritative "where is the guard
     // looking". Who owns the head decides how:
     //  - tracking a point: the cone must EQUAL the head. No easing - the sensor is a child of the body,
@@ -360,12 +339,14 @@ public partial class Guard : CharacterBody3D
     //    direction reversals; lost sight).
     //  - clip owns the head (patrol, scan): ease, purely to low-pass the walk cycle's head sway. There
     //    is no target to lose, so lag costs nothing here.
-    // TrackVertically decides whether pitch rides along or is flattened to keep the cone level. Only
-    // rotation changes; the sensor stays pinned at eye height.
+    // Pitch rides along only when it is bob-safe and useful (tracking a target up stairs, or the
+    // standing scan sweep); otherwise it is flattened so the walk cycle's head bob can't tilt the cone.
+    // Only rotation changes; the sensor stays pinned at eye height.
     private void AimSensor(bool tracking, float dt)
     {
         Vector3 forward = _rig.HeadForward;            // where the head is looking
-        if (!TrackVertically) forward.Y = 0f;         // yaw-only: flatten to level -> kills walk-cycle bob
+        bool trackVertically = _scanning || _state == State.Targeting;
+        if (!trackVertically) forward.Y = 0f;         // yaw-only: flatten to level -> kills walk-cycle bob
         if (forward.IsZeroApprox()) return;           // no usable direction -> keep last aim
 
         Transform3D aim = _vision.GlobalTransform.LookingAt(_vision.GlobalPosition + forward, Vector3.Up);
