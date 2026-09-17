@@ -65,7 +65,6 @@ public partial class Guard : CharacterBody3D
     private int _wp = 0;                 // index of the current patrol waypoint
     private float _scanTimer = 0f;       // progress through the current look-around sweep
     private float _searchTimer = 0f;     // time spent in the current search (drives the timeout)
-    private float _gravity;              // downward accel, read from ProjectSettings in _Ready
 
     private NavigationAgent3D _agent;    // pathfinding component (set in _Ready)
     private VisionSensor _vision;        // reusable perception sensor (cone + line-of-sight); owner points it each frame
@@ -83,7 +82,6 @@ public partial class Guard : CharacterBody3D
         _rig = GetNode<GuardRig>("GuardModel");
         _player = GetTree().GetFirstNodeInGroup("player") as PlayerController;
         _meter = new AwarenessMeter(DetectRate, DecayRate);
-        _gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").As<float>();
         _label = GetNode<Label3D>("StateLabel");   // billboard/font/position are configured in Guard.tscn
 
         // The agent's static avoidance settings (avoidance_enabled / radius / height) now live on
@@ -164,11 +162,7 @@ public partial class Guard : CharacterBody3D
             case State.Targeting:
                 // Fully alerted; drops to a search the moment line of sight is lost.
                 _meter.Pin();
-                if (!seen)
-                {
-                    GD.Print($"[Guard DIAG] lost sight: {DiagLine()}");   // DIAG (temporary)
-                    EnterSearching();
-                }
+                if (!seen) EnterSearching();
                 break;
 
             case State.Searching:
@@ -276,7 +270,7 @@ public partial class Guard : CharacterBody3D
         Vector3 v = Velocity;
         v.X = safeVelocity.X;                                  // avoidance-adjusted horizontal velocity
         v.Z = safeVelocity.Z;
-        v.Y -= _gravity * (float)GetPhysicsProcessDeltaTime();  // keep the guard on the floor
+        v += GetGravity() * (float)GetPhysicsProcessDeltaTime();   // keep the guard on the floor (project gravity + any Area3D override)
         Velocity = v;
         MoveAndSlide();                                        // the ONE place we move (avoidance is on)
     }
@@ -385,25 +379,9 @@ public partial class Guard : CharacterBody3D
     {
         Color c = StateColor();
         _vision.SetConeColor(c);                                  // recolor the debug cone by state
-        _label.Text = $"{_state} {(int)(_meter.Value * 100f)}%\n{DiagLine()}";   // DIAG (temporary second line)
+        _label.Text = $"{_state} {(int)(_meter.Value * 100f)}%";
         _label.Modulate = c;
     }
-
-    // ---- DIAG (temporary): cone/head sync + arrival investigation. Remove when resolved. ----
-    // cone = angle between the vision sensor's forward and the direction to the player's look anchor
-    // head = same angle for the head's forward (what the cone is easing toward)
-    // d    = distance to the player;  v = horizontal speed;  nav = IsNavigationFinished
-    private string DiagLine()
-    {
-        if (_player == null) return "no player";
-        Vector3 anchor = _player.LookAnchorPosition;
-        Vector3 toFromCone = anchor - _vision.GlobalPosition;
-        float coneErr = Mathf.RadToDeg((-_vision.GlobalBasis.Z).AngleTo(toFromCone));
-        float headErr = Mathf.RadToDeg(_rig.HeadForward.AngleTo(toFromCone));
-        float dist = GlobalPosition.DistanceTo(_player.GlobalPosition);
-        return $"cone {coneErr,3:F0} head {headErr,3:F0} d {dist:F2} v {HorizontalSpeed:F1} nav {(_arrived ? "stop" : "go")}";
-    }
-    // ---- end DIAG ----
 
     // Debug color per awareness state (green -> yellow -> orange -> red).
     private Color StateColor() => _state switch
