@@ -17,17 +17,21 @@ public class AwarenessMeter
         _decayRate = decayRate;
     }
 
-    // Current awareness in [0, 1].
-    public float Value { get; private set; }
+    private float _value;
+
+    // Current awareness, always clamped to [0, 1]: every write goes through this setter.
+    public float Value
+    {
+        get => _value;
+        private set => _value = Math.Clamp(value, 0f, 1f);
+    }
 
     // Ramp up while the target is visible; proximity (1 up close, toward 0 far away) scales the rate.
-    public void Fill(float dt, float proximity) => Set(Value + _detectRate * proximity * dt);
+    public void Fill(float dt, float proximity) => Value += _detectRate * proximity * dt;
 
     // Bleed down while the target is not visible.
-    public void Decay(float dt) => Set(Value - _decayRate * dt);
+    public void Decay(float dt) => Value -= _decayRate * dt;
 
     // Snap to fully alerted (used while actively targeting the player).
     public void Pin() => Value = 1f;
-
-    private void Set(float value) => Value = Math.Clamp(value, 0f, 1f);
 }
