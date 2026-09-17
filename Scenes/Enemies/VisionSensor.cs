@@ -24,6 +24,7 @@ public partial class VisionSensor : Node3D
 
     // Points sampled on the target's body (low / torso / head). Seeing ANY one counts as
     // "seen", so a target peeking over low cover is still detected.
+    // SEAM: these encode the target's anatomy; they belong on the target (like LookAnchorPosition).
     private static readonly Vector3[] SampleOffsets =
     {
         new Vector3(0f, 0.2f, 0f),   // low
