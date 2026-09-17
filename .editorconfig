@@ -1,0 +1,48 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# C# - Godot's official C# style guide
+# https://docs.godotengine.org/en/stable/tutorials/scripting/c_sharp/c_sharp_style_guide.html
+[*.cs]
+max_line_length = 100
+
+# Allman braces
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+
+# Don't double-indent switch section contents
+csharp_indent_case_contents_when_block = false
+
+# using directives
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:warning
+
+# Require explicit access modifiers
+dotnet_style_require_accessibility_modifiers = always
+dotnet_diagnostic.IDE0040.severity = warning
+
+[*.{csproj,props,targets}]
+indent_size = 2
+
+[*.{sln,csproj,props,targets}]
+end_of_line = crlf
+
+# .NET convention: project files carry no trailing newline
+[*.csproj]
+insert_final_newline = false
+
+# Godot writes these itself; don't let the editor fight its serializer
+[*.{tscn,tres,godot,import,uid}]
+trim_trailing_whitespace = false
+insert_final_newline = false

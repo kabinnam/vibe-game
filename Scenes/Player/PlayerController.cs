@@ -23,6 +23,10 @@ public partial class PlayerController : CharacterBody3D
 
 	private Node3D _visuals;
 	private AnimationPlayer _animation_player;
+	private Marker3D _lookAnchor; // LookAnchor marker in Player.tscn: where NPCs should aim their heads at us
+
+	// Public API for observers (e.g. Guard). The player owns knowledge of its own anatomy; move the LookAnchor node to change it.
+	public Vector3 LookAnchorPosition => _lookAnchor.GlobalPosition;
 
 	private Node3D _springArmPivot;
 	private SpringArm3D _springArm;
@@ -34,6 +38,7 @@ public partial class PlayerController : CharacterBody3D
 		Input.MouseMode = Input.MouseModeEnum.Captured;
 		_visuals = GetNode<Node3D>("Visuals");
 		_animation_player = GetNode<AnimationPlayer>("Visuals/YBot/AnimationPlayer");
+		_lookAnchor = GetNode<Marker3D>("%LookAnchor");
 
 		_springArmPivot = GetNode<Node3D>("SpringArmPivot");
 		_springArm = GetNode<SpringArm3D>("SpringArmPivot/SpringArm3D");
