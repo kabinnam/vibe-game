@@ -7,7 +7,6 @@ namespace VibeGame.Enemies;
 // the head-gaze probe. The guard's AI talks only to these methods, so it never needs bone names,
 // node paths inside the model, or AnimationTree parameter strings. Swap the model and only this
 // file (and the scene) change.
-[GlobalClass]
 public partial class GuardRig : Node3D
 {
     // Names authored in the AnimationTree (GuardModel.tscn). Declared once, here, so the rest of the
