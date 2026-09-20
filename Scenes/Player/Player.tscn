@@ -6,6 +6,7 @@
 [ext_resource type="AnimationLibrary" uid="uid://bhsi27wsrlndn" path="res://Assets/Animations/Smoking.fbx" id="3_4wape"]
 [ext_resource type="AnimationLibrary" uid="uid://77166bvgmsug" path="res://Assets/Animations/StandIdle.fbx" id="3_jmcll"]
 [ext_resource type="AnimationLibrary" uid="uid://pbmmwf86dfit" path="res://Assets/Animations/Walking.fbx" id="4_4wape"]
+[ext_resource type="Script" uid="uid://8885gom1j5k2" path="res://Scenes/Player/Sanity.cs" id="7_t26db"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.35
@@ -33,7 +34,7 @@ script = ExtResource("1")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
 
-[node name="LookAnchor" type="Marker3D" parent="."]
+[node name="LookAnchor" type="Marker3D" parent="." unique_id=1542328161]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 
@@ -53,19 +54,21 @@ spring_length = 2.5
 [node name="YBot" parent="Visuals" unique_id=292012719 instance=ExtResource("1_ybot")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
-[node name="GeneralSkeleton" parent="Visuals/YBot" index="0" unique_id=888788673]
-unique_name_in_owner = true
-
-[node name="Alpha_Surface" parent="Visuals/YBot/GeneralSkeleton" index="0" unique_id=1291032798]
+[node name="Alpha_Surface" parent="Visuals/YBot/GeneralSkeleton" parent_id_path=PackedInt32Array(292012719, 616946334) index="0" unique_id=557151689]
 surface_material_override/0 = SubResource("StandardMaterial3D_gffps")
 
-[node name="Alpha_Joints" parent="Visuals/YBot/GeneralSkeleton" index="1" unique_id=326009784]
+[node name="Alpha_Joints" parent="Visuals/YBot/GeneralSkeleton" parent_id_path=PackedInt32Array(292012719, 616946334) index="1" unique_id=1790312716]
 surface_material_override/0 = SubResource("StandardMaterial3D_l4iut")
 
-[node name="AnimationPlayer" parent="Visuals/YBot" index="1" unique_id=51669470]
+[node name="AnimationPlayer" parent="Visuals/YBot" index="1" unique_id=158963745]
 libraries/Jogging = ExtResource("2_ude3g")
 libraries/Smoking = ExtResource("3_4wape")
 libraries/StandIdle = ExtResource("3_jmcll")
 libraries/Walking = ExtResource("4_4wape")
 autoplay = &"StandIdle/mixamo_com"
 playback_default_blend_time = 0.2
+
+[node name="Sanity" type="Node" parent="." unique_id=1190216816]
+script = ExtResource("7_t26db")
+
+[editable path="Visuals/YBot"]
