@@ -4,6 +4,7 @@ using VibeGame;
 public partial class Main : Node3D
 {
     [Export] public float SanityDurationSeconds { get; set; } = 60f;
+    [Export] public float LevelDurationSeconds { get; set; } = 300f; // 5 minutes
 
     private SanityMeter _sanity;
     private HUD _hud;
@@ -14,7 +15,7 @@ public partial class Main : Node3D
     {
         _sanity = new SanityMeter();
         _hud = GetNode<HUD>("HUD");
-        _timeRemaining = Mathf.Max(SanityDurationSeconds, 0.01f);
+        _timeRemaining = Mathf.Max(LevelDurationSeconds, 0.01f);
         _hud.SetSanity(_sanity.Value);
         _hud.SetTimeRemaining(_timeRemaining);
     }
@@ -32,7 +33,7 @@ public partial class Main : Node3D
         _hud.SetSanity(_sanity.Value);
         _hud.SetTimeRemaining(_timeRemaining);
 
-        if (_sanity.IsEmpty)
+        if (_sanity.IsEmpty || _timeRemaining <= 0f)
         {
             _ended = true;
             GetTree().ChangeSceneToFile("res://Scenes/UI/GameOver.tscn");

@@ -19,7 +19,9 @@ public partial class HUD : CanvasLayer
 
     public void SetTimeRemaining(float seconds)
     {
-        int display = Mathf.Max(0, Mathf.CeilToInt(seconds));
-        _timerLabel.Text = $"Countdown: {display}";
+        int total = Mathf.Max(0, Mathf.CeilToInt(seconds));
+        int minutes = total / 60;
+        int secs = total % 60;
+        _timerLabel.Text = $"{minutes:D2}:{secs:D2}";
     }
 }

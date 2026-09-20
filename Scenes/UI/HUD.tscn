@@ -23,15 +23,11 @@ offset_left = -47.5
 offset_right = 47.5
 offset_bottom = 23.0
 grow_horizontal = 2
-text = "Countdown: "
+text = "Level Timer"
 
 [node name="SanityBar" type="ProgressBar" parent="Control" unique_id=282899692]
 layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_top = -24.0
 offset_right = 200.0
-grow_vertical = 0
+offset_bottom = 27.0
 mouse_filter = 2
 value = 100.0
