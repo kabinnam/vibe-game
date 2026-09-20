@@ -2,6 +2,7 @@
 
 [ext_resource type="PackedScene" uid="uid://bplayer001" path="res://Scenes/Player/Player.tscn" id="1"]
 [ext_resource type="PackedScene" uid="uid://barena001" path="res://Scenes/Environment/Arena.tscn" id="2"]
+[ext_resource type="PackedScene" uid="uid://c48xmjsasp8kc" path="res://Scenes/UI/HUD.tscn" id="3_kln2b"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.35, 0.55, 0.82, 1)
@@ -30,3 +31,5 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.002571106, -0.0075712204, -
 
 [node name="Player" parent="." unique_id=1567667765 instance=ExtResource("1")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="HUD" parent="." unique_id=1811809882 instance=ExtResource("3_kln2b")]

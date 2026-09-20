@@ -2,10 +2,6 @@
 
 [ext_resource type="Script" uid="uid://du535nb1g12d5" path="res://Scenes/Player/PlayerController.cs" id="1"]
 [ext_resource type="PackedScene" uid="uid://c8xahiuvgh46h" path="res://Assets/Characters/YBot.fbx" id="1_ybot"]
-[ext_resource type="AnimationLibrary" uid="uid://vwvd2adnxquv" path="res://Assets/Animations/Jogging.fbx" id="2_ude3g"]
-[ext_resource type="AnimationLibrary" uid="uid://bhsi27wsrlndn" path="res://Assets/Animations/Smoking.fbx" id="3_4wape"]
-[ext_resource type="AnimationLibrary" uid="uid://77166bvgmsug" path="res://Assets/Animations/StandIdle.fbx" id="3_jmcll"]
-[ext_resource type="AnimationLibrary" uid="uid://pbmmwf86dfit" path="res://Assets/Animations/Walking.fbx" id="4_4wape"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.35
@@ -14,18 +10,6 @@ height = 1.8
 [sub_resource type="SphereShape3D" id="SphereShape3D_cam"]
 radius = 0.2
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gffps"]
-resource_name = "Alpha_Body_MAT"
-vertex_color_use_as_albedo = true
-albedo_color = Color(0.30798686, 0.61579585, 0.67822284, 1)
-emission_enabled = true
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l4iut"]
-resource_name = "Alpha_Joints_MAT"
-vertex_color_use_as_albedo = true
-albedo_color = Color(0.38536474, 0.44959307, 0.4586855, 1)
-emission_enabled = true
-
 [node name="Player" type="CharacterBody3D" unique_id=675585097 groups=["player"]]
 script = ExtResource("1")
 
@@ -33,7 +17,7 @@ script = ExtResource("1")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
 
-[node name="LookAnchor" type="Marker3D" parent="."]
+[node name="LookAnchor" type="Marker3D" parent="." unique_id=766696275]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 
@@ -52,20 +36,3 @@ spring_length = 2.5
 
 [node name="YBot" parent="Visuals" unique_id=292012719 instance=ExtResource("1_ybot")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
-
-[node name="GeneralSkeleton" parent="Visuals/YBot" index="0" unique_id=888788673]
-unique_name_in_owner = true
-
-[node name="Alpha_Surface" parent="Visuals/YBot/GeneralSkeleton" index="0" unique_id=1291032798]
-surface_material_override/0 = SubResource("StandardMaterial3D_gffps")
-
-[node name="Alpha_Joints" parent="Visuals/YBot/GeneralSkeleton" index="1" unique_id=326009784]
-surface_material_override/0 = SubResource("StandardMaterial3D_l4iut")
-
-[node name="AnimationPlayer" parent="Visuals/YBot" index="1" unique_id=51669470]
-libraries/Jogging = ExtResource("2_ude3g")
-libraries/Smoking = ExtResource("3_4wape")
-libraries/StandIdle = ExtResource("3_jmcll")
-libraries/Walking = ExtResource("4_4wape")
-autoplay = &"StandIdle/mixamo_com"
-playback_default_blend_time = 0.2
