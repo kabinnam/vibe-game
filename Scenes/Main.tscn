@@ -3,6 +3,7 @@
 [ext_resource type="PackedScene" uid="uid://bplayer001" path="res://Scenes/Player/Player.tscn" id="1"]
 [ext_resource type="PackedScene" uid="uid://barena001" path="res://Scenes/Environment/Arena.tscn" id="2"]
 [ext_resource type="PackedScene" uid="uid://c48xmjsasp8kc" path="res://Scenes/UI/HUD.tscn" id="3_kln2b"]
+[ext_resource type="Script" path="res://Scenes/Main.cs" id="4_main"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.35, 0.55, 0.82, 1)
@@ -22,6 +23,7 @@ tonemap_mode = 2
 ssao_enabled = true
 
 [node name="Main" type="Node3D" unique_id=1282119149]
+script = ExtResource("4_main")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1843362544]
 environment = SubResource("Environment_1")
