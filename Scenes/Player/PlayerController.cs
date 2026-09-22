@@ -1,4 +1,6 @@
+using System;
 using Godot;
+using VibeGame.Player;
 
 public partial class PlayerController : CharacterBody3D
 {
@@ -8,7 +10,7 @@ public partial class PlayerController : CharacterBody3D
     [Export] public float JumpVelocity = 4.5f;
     [Export] public float MouseSensitivity = 0.002f;
     [Export] public float Gravity = 9.8f;
-
+    [Export] public float VapingSanityRecoveryRate = 6f;
     // Camera tunables
     [Export] public float TiltLimitDegrees = 80.0f; // how far up and down the player can look--keeps us from inverting the camera and helps prevent looking inside the model.
     [Export] public float ThirdPersonSpringLength = 2.5f;
@@ -19,14 +21,16 @@ public partial class PlayerController : CharacterBody3D
     // Non-Exported Variables
     public float Speed = 3.0f;
     public bool is_running = false;
-    public bool is_locked = false; // If the player is locked, they cannot move or rotate (Useful for actions like kicking or maybe smoking?)
 
     private Node3D _visuals;
     private AnimationPlayer _animation_player;
     private Marker3D _lookAnchor; // LookAnchor marker in Player.tscn: where NPCs should aim their heads at us
+    private Sanity _sanity;
+    private Guid _vapingSanityModifierHandle;
 
     // Public API for observers (e.g. Guard). The player owns knowledge of its own anatomy; move the LookAnchor node to change it.
     public Vector3 LookAnchorPosition => _lookAnchor.GlobalPosition;
+    public bool IsVaping { get; private set; }
 
     private Node3D _springArmPivot;
     private SpringArm3D _springArm;
@@ -35,6 +39,12 @@ public partial class PlayerController : CharacterBody3D
 
     public override void _Ready()
     {
+        if (!float.IsFinite(VapingSanityRecoveryRate) || VapingSanityRecoveryRate < 0f)
+        {
+            throw new InvalidOperationException("PlayerController: VapingSanityRecoveryRate must be finite and non-negative.");
+        }
+        _sanity = GetNode<Sanity>("Sanity");
+
         Input.MouseMode = Input.MouseModeEnum.Captured;
         _visuals = GetNode<Node3D>("Visuals");
         _animation_player = GetNode<AnimationPlayer>("Visuals/YBot/AnimationPlayer");
@@ -78,20 +88,8 @@ public partial class PlayerController : CharacterBody3D
 
     public override void _PhysicsProcess(double delta)
     {
-        // Handle smoking
-        if(Input.IsActionJustPressed("smoke"))
-        {
-            if(_animation_player.GetCurrentAnimation() != "Smoking/mixamo_com")
-            {
-                _animation_player.Play("Smoking/mixamo_com");
-                is_locked = true;
-            }
-        }
-
-        if(!_animation_player.IsPlaying())
-        {
-            is_locked = false;
-        }
+        // Handle vaping
+        HandleVaping(GetWindow().HasFocus() && Input.IsActionPressed("smoke"));
 
         // Handle running
         if (Input.IsActionPressed("run"))
@@ -126,18 +124,18 @@ public partial class PlayerController : CharacterBody3D
             .Normalized();
         if (direction != Vector3.Zero)
         {
-            if(!is_locked)
+            if (!IsVaping)
             {
                 if (is_running)
                 {
-                    if(_animation_player.GetCurrentAnimation() != "running")
+                    if (_animation_player.GetCurrentAnimation() != "running")
                     {
                         _animation_player.Play("Jogging/mixamo_com");
                     }
                 }
                 else
                 {
-                    if(_animation_player.GetCurrentAnimation() != "walking")
+                    if (_animation_player.GetCurrentAnimation() != "walking")
                     {
                         _animation_player.Play("Walking/mixamo_com");
                     }
@@ -149,7 +147,7 @@ public partial class PlayerController : CharacterBody3D
         }
         else
         {
-            if(!is_locked && _animation_player.GetCurrentAnimation() != "idle")
+            if (!IsVaping && _animation_player.GetCurrentAnimation() != "idle")
             {
                 _animation_player.Play("StandIdle/mixamo_com");
             }
@@ -159,14 +157,32 @@ public partial class PlayerController : CharacterBody3D
         }
 
         Velocity = velocity;
-        // While locked (e.g. mid-kick) the character neither turns nor moves
-        if(!is_locked)
-        {
-            UpdateCharacterFacing(direction);
-            MoveAndSlide();
-        }
+        UpdateCharacterFacing(direction);
+        MoveAndSlide();
     }
 
+    private void HandleVaping(bool isVapingPressed)
+    {
+        if (IsVaping == isVapingPressed)
+        {
+            return;
+        }
+
+        if (isVapingPressed)
+        {
+            _vapingSanityModifierHandle = _sanity.AddRateModifier(VapingSanityRecoveryRate);
+            // SEAM: Whole-body looping is provisional. Replace with layered vaping
+            // animation later; IsVaping and sanity recovery remain gameplay-owned.
+            _animation_player.Play("Smoking/mixamo_com");
+        }
+        else
+        {
+            _sanity.RemoveRateModifier(_vapingSanityModifierHandle);
+            _vapingSanityModifierHandle = Guid.Empty;
+        }
+
+        IsVaping = isVapingPressed;
+    }
     private void ApplyPerspective()
     {
         if (_firstPerson)
