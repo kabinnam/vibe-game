@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://c48xmjsasp8kc"]
+
+[ext_resource type="Script" uid="uid://c6jd002rnsp0d" path="res://Scenes/UI/HUD.cs" id="1_hud"]
+
+[node name="HUD" type="CanvasLayer" unique_id=1811809882]
+script = ExtResource("1_hud")
+
+[node name="Control" type="Control" parent="." unique_id=1422340203]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="LevelTimerLabel" type="Label" parent="Control" unique_id=901320072]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -47.5
+offset_right = 47.5
+offset_bottom = 23.0
+grow_horizontal = 2
+text = "Level Timer"
+
+[node name="SanityBar" type="ProgressBar" parent="Control" unique_id=282899692]
+layout_mode = 1
+offset_right = 200.0
+offset_bottom = 27.0
+mouse_filter = 2
+value = 100.0

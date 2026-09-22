@@ -7,6 +7,9 @@ public partial class GameOver : Control
 
 	public override void _Ready()
 	{
+		// The player captured the mouse during gameplay; the game-over UI needs it back.
+		Input.MouseMode = Input.MouseModeEnum.Visible;
+
 		_restartButton = GetNode<Button>("CenterContainer/VBoxContainer/RestartButton");
 		_quitButton = GetNode<Button>("CenterContainer/VBoxContainer/QuitButton");
 
