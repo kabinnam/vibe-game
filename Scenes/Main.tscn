@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://c48xmjsasp8kc" path="res://Scenes/UI/HUD.tscn" id="3_kln2b"]
 [ext_resource type="Script" uid="uid://bivw5hxvk3toa" path="res://Scenes/Main.cs" id="4_main"]
 [ext_resource type="Script" uid="uid://cprvjwt0diswq" path="res://Scenes/UI/SanityReadout.cs" id="5_sanity"]
+[ext_resource type="PackedScene" uid="uid://bpausemenu001" path="res://Scenes/UI/PauseMenu.tscn" id="6_pause"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 sky_top_color = Color(0.35, 0.55, 0.82, 1)
@@ -36,6 +37,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.002571106, -0.0075712204, -
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
 [node name="HUD" parent="." unique_id=1811809882 instance=ExtResource("3_kln2b")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("6_pause")]
 
 [node name="DevOverlay" type="CanvasLayer" parent="." unique_id=8867321]
 
