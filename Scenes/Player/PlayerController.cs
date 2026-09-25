@@ -70,14 +70,6 @@ public partial class PlayerController : CharacterBody3D
             _springArmPivot.Rotation = rot;
         }
 
-        // Toggle the mouse cursor: first press frees it, next press recaptures it
-        if (@event.IsActionPressed("ui_cancel"))
-        {
-            Input.MouseMode = Input.MouseMode == Input.MouseModeEnum.Captured
-                ? Input.MouseModeEnum.Visible
-                : Input.MouseModeEnum.Captured;
-        }
-
         // Toggle between first- and third-person view
         if (@event.IsActionPressed("toggle_perspective"))
         {
