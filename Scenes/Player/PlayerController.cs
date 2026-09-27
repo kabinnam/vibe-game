@@ -25,12 +25,12 @@ public partial class PlayerController : CharacterBody3D
     private Node3D _visuals;
     private AnimationPlayer _animation_player;
     private Marker3D _lookAnchor; // LookAnchor marker in Player.tscn: where NPCs should aim their heads at us
-    private Sanity _sanity;
     private Guid _vapingSanityModifierHandle;
 
-    // Public API for observers (e.g. Guard). The player owns knowledge of its own anatomy; move the LookAnchor node to change it.
+    // Public API for observers (e.g. Guard, Main). The player owns knowledge of its own anatomy; move the LookAnchor node to change it.
     public Vector3 LookAnchorPosition => _lookAnchor.GlobalPosition;
     public bool IsVaping { get; private set; }
+    public Sanity Sanity { get; private set; }
 
     private Node3D _springArmPivot;
     private SpringArm3D _springArm;
@@ -43,7 +43,7 @@ public partial class PlayerController : CharacterBody3D
         {
             throw new InvalidOperationException("PlayerController: VapingSanityRecoveryRate must be finite and non-negative.");
         }
-        _sanity = GetNode<Sanity>("Sanity");
+        Sanity = GetNode<Sanity>("Sanity");
 
         Input.MouseMode = Input.MouseModeEnum.Captured;
         _visuals = GetNode<Node3D>("Visuals");
@@ -162,14 +162,14 @@ public partial class PlayerController : CharacterBody3D
 
         if (isVapingPressed)
         {
-            _vapingSanityModifierHandle = _sanity.AddRateModifier(VapingSanityRecoveryRate);
+            _vapingSanityModifierHandle = Sanity.AddRateModifier(VapingSanityRecoveryRate);
             // SEAM: Whole-body looping is provisional. Replace with layered vaping
             // animation later; IsVaping and sanity recovery remain gameplay-owned.
             _animation_player.Play("Smoking/mixamo_com");
         }
         else
         {
-            _sanity.RemoveRateModifier(_vapingSanityModifierHandle);
+            Sanity.RemoveRateModifier(_vapingSanityModifierHandle);
             _vapingSanityModifierHandle = Guid.Empty;
         }
 
