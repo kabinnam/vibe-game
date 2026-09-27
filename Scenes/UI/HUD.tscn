@@ -30,7 +30,7 @@ theme_override_constants/margin_bottom = 24
 layout_mode = 2
 mouse_filter = 2
 
-[node name="SanityBar" type="ProgressBar" parent="Control/MarginContainer/SafeArea" unique_id=282899692]
+[node name="SanityMeter" type="ProgressBar" parent="Control/MarginContainer/SafeArea" unique_id=282899692]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(200, 0)
 layout_mode = 1
