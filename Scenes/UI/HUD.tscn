@@ -14,20 +14,44 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="LevelTimerLabel" type="Label" parent="Control" unique_id=901320072]
+[node name="MarginContainer" type="MarginContainer" parent="Control" unique_id=1960673635]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="SafeArea" type="Control" parent="Control/MarginContainer" unique_id=230531863]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="SanityBar" type="ProgressBar" parent="Control/MarginContainer/SafeArea" unique_id=282899692]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -27.0
+offset_right = 200.0
+grow_vertical = 0
+mouse_filter = 2
+value = 100.0
+
+[node name="LevelTimerLabel" type="Label" parent="Control/MarginContainer/SafeArea" unique_id=901320072]
+unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -47.5
-offset_right = 47.5
+offset_left = -45.0
+offset_right = 45.0
 offset_bottom = 23.0
 grow_horizontal = 2
 text = "Level Timer"
-
-[node name="SanityBar" type="ProgressBar" parent="Control" unique_id=282899692]
-layout_mode = 1
-offset_right = 200.0
-offset_bottom = 27.0
-mouse_filter = 2
-value = 100.0
+horizontal_alignment = 1

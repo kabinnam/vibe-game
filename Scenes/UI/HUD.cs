@@ -7,8 +7,8 @@ public partial class HUD : CanvasLayer
 
     public override void _Ready()
     {
-        _bar = GetNode<ProgressBar>("Control/SanityBar");
-        _timerLabel = GetNode<Label>("Control/LevelTimerLabel");
+        _bar = GetNode<ProgressBar>("%SanityBar");
+        _timerLabel = GetNode<Label>("%LevelTimerLabel");
         SetSanity(1f);
     }
 
