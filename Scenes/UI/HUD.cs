@@ -1,5 +1,7 @@
 using Godot;
 
+namespace VibeGame.UI;
+
 public partial class HUD : CanvasLayer
 {
     private Range _sanityMeter;

@@ -1,5 +1,8 @@
 using Godot;
 using VibeGame.Player;
+using VibeGame.UI;
+
+namespace VibeGame;
 
 public partial class Main : Node3D
 {
@@ -21,7 +24,7 @@ public partial class Main : Node3D
         // Children _Ready first, so Sanity's initial ValueChanged already fired; seed by hand.
         _hud.SanityMax = _sanity.Max;
         _hud.SetSanity(_sanity.CurrentValue);
-        
+
         _timeRemaining = Mathf.Max(LevelDurationSeconds, 0.01f);
         _hud.SetTimeRemaining(_timeRemaining);
     }

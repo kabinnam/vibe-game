@@ -1,4 +1,5 @@
 using Godot;
+using VibeGame.Player;
 
 namespace VibeGame.Enemies;
 

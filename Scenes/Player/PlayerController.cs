@@ -1,6 +1,7 @@
 using System;
 using Godot;
-using VibeGame.Player;
+
+namespace VibeGame.Player;
 
 public partial class PlayerController : CharacterBody3D
 {
