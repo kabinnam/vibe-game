@@ -1,42 +1,59 @@
 using Godot;
-using VibeGame;
+using VibeGame.Player;
+using VibeGame.UI;
+
+namespace VibeGame;
 
 public partial class Main : Node3D
 {
-    [Export] public float SanityDurationSeconds { get; set; } = 60f;
     [Export] public float LevelDurationSeconds { get; set; } = 300f; // 5 minutes
 
-    private SanityMeter _sanity;
+    private Sanity _sanity;
     private HUD _hud;
     private float _timeRemaining;
     private bool _ended;
 
     public override void _Ready()
     {
-        _sanity = new SanityMeter();
+        _sanity = GetNode<PlayerController>("Player").Sanity;
         _hud = GetNode<HUD>("HUD");
+
+        _sanity.ValueChanged += _hud.SetSanity;
+        _sanity.Exhausted += EndRun;
+
+        // Children _Ready first, so Sanity's initial ValueChanged already fired; seed by hand.
+        _hud.SanityMax = _sanity.Max;
+        _hud.SetSanity(_sanity.CurrentValue);
+
         _timeRemaining = Mathf.Max(LevelDurationSeconds, 0.01f);
-        _hud.SetSanity(_sanity.Value);
         _hud.SetTimeRemaining(_timeRemaining);
+    }
+
+    public override void _ExitTree()
+    {
+        _sanity.ValueChanged -= _hud.SetSanity;
+        _sanity.Exhausted -= EndRun;
     }
 
     public override void _Process(double delta)
     {
-        if (_ended)
-            return;
-
-        float duration = Mathf.Max(SanityDurationSeconds, 0.01f);
-        float perSecond = 1f / duration;
-        _sanity.Decay((float)delta, perSecond);
         _timeRemaining = Mathf.Max(0f, _timeRemaining - (float)delta);
-
-        _hud.SetSanity(_sanity.Value);
         _hud.SetTimeRemaining(_timeRemaining);
 
-        if (_sanity.IsEmpty || _timeRemaining <= 0f)
+        if (_timeRemaining <= 0f)
         {
-            _ended = true;
-            GetTree().ChangeSceneToFile("res://Scenes/UI/GameOver.tscn");
+            EndRun();
         }
+    }
+
+    private void EndRun()
+    {
+        if (_ended)
+        {
+            return;
+        }
+
+        _ended = true;
+        GetTree().ChangeSceneToFile("res://Scenes/UI/GameOver.tscn");
     }
 }

@@ -1,20 +1,27 @@
 using Godot;
 
+namespace VibeGame.UI;
+
 public partial class HUD : CanvasLayer
 {
-    private ProgressBar _bar;
-    private Label _timerLabel;
+    private Range _sanityMeter;
+    private Label _levelTimerLabel;
 
     public override void _Ready()
     {
-        _bar = GetNode<ProgressBar>("Control/SanityBar");
-        _timerLabel = GetNode<Label>("Control/LevelTimerLabel");
-        SetSanity(1f);
+        _sanityMeter = GetNode<Range>("%SanityMeter");
+        _levelTimerLabel = GetNode<Label>("%LevelTimerLabel");
     }
 
-    public void SetSanity(float sanity01)
+    public float SanityMax
     {
-        _bar.Value = sanity01 * (float)_bar.MaxValue;
+        get => (float)_sanityMeter.MaxValue;
+        set => _sanityMeter.MaxValue = value;
+    }
+
+    public void SetSanity(float current)
+    {
+        _sanityMeter.Value = current;
     }
 
     public void SetTimeRemaining(float seconds)
@@ -22,6 +29,6 @@ public partial class HUD : CanvasLayer
         int total = Mathf.Max(0, Mathf.CeilToInt(seconds));
         int minutes = total / 60;
         int secs = total % 60;
-        _timerLabel.Text = $"{minutes:D2}:{secs:D2}";
+        _levelTimerLabel.Text = $"{minutes:D2}:{secs:D2}";
     }
 }
