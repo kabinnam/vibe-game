@@ -2,10 +2,15 @@ using Godot;
 
 public partial class PauseMenu : CanvasLayer
 {
+    private Button _resumeButton;
+    private Button _quitButton;
+
     public override void _Ready()
     {
-        GetNode<Button>("CenterContainer/VBoxContainer/ResumeButton").Pressed += Resume;
-        GetNode<Button>("CenterContainer/VBoxContainer/QuitButton").Pressed += () => GetTree().Quit();
+        _resumeButton = GetNode<Button>("CenterContainer/VBoxContainer/ResumeButton");
+        _resumeButton.Pressed += Resume;
+        _quitButton = GetNode<Button>("CenterContainer/VBoxContainer/QuitButton");
+        _quitButton.Pressed += () => GetTree().Quit();
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -20,6 +25,7 @@ public partial class PauseMenu : CanvasLayer
     {
         GetTree().Paused = true;
         Visible = true;
+        _resumeButton.GrabFocus();
         Input.MouseMode = Input.MouseModeEnum.Visible;
     }
 
