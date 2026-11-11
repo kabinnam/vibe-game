@@ -1,0 +1,30 @@
+[gd_resource type="AnimationLibrary" format=3 uid="uid://lw04u2p33j12"]
+
+[sub_resource type="Animation" id="Animation_yyu1g"]
+loop_mode = 1
+tracks/0/type = "rotation_3d"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("%GeneralSkeleton:RightUpperArm")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = PackedFloat32Array(0, 1, -0.27395493, 0.6102625, -0.5901941, -0.45188424)
+tracks/1/type = "rotation_3d"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("%GeneralSkeleton:RightLowerArm")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = PackedFloat32Array(0, 1, 0.7543205, 0.22185738, -0.37966305, 0.48747915)
+tracks/2/type = "rotation_3d"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("%GeneralSkeleton:RightHand")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = PackedFloat32Array(0, 1, 0.18698797, -0.75600964, 0.044787157, 0.6256829)
+
+[resource]
+_data = {
+&"Vape": SubResource("Animation_yyu1g")
+}

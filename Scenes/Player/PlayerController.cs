@@ -18,13 +18,15 @@ public partial class PlayerController : CharacterBody3D
     [Export] public float ThirdPersonFov = 75.0f;
     [Export] public float FirstPersonFov = 90.0f;
     [Export] public Vector3 FirstPersonCameraOffset = new Vector3(0.0f, 0.16f, -0.22f); // manually tweaked and very specific to our ybot model. pushes first person camera right in front of the face.
+    [Export] public float VapeArmRaiseSpeed = 4.0f; // 4 = about 0.25s to raise or lower the arm
 
     // Non-Exported Variables
     public float Speed = 3.0f;
     public bool is_running = false;
 
     private Node3D _visuals;
-    private AnimationPlayer _animation_player;
+    private AnimationTree _animTree;
+    private float _vapeArmBlend; // 0 = arm follows idle/walk/run, 1 = hand at mouth
     private Marker3D _lookAnchor; // LookAnchor marker in Player.tscn: where NPCs should aim their heads at us
     private Guid _vapingSanityModifierHandle;
 
@@ -38,6 +40,10 @@ public partial class PlayerController : CharacterBody3D
     private Camera3D _camera;
     private bool _firstPerson = false;
 
+    // Node names authored in the AnimationTree in Player.tscn. They must match exactly.
+    private static readonly StringName LocomotionRequestParam = "parameters/Locomotion/transition_request";
+    private static readonly StringName VapeBlendParam = "parameters/VapeBlend/blend_amount";
+
     public override void _Ready()
     {
         if (!float.IsFinite(VapingSanityRecoveryRate) || VapingSanityRecoveryRate < 0f)
@@ -48,7 +54,8 @@ public partial class PlayerController : CharacterBody3D
 
         Input.MouseMode = Input.MouseModeEnum.Captured;
         _visuals = GetNode<Node3D>("Visuals");
-        _animation_player = GetNode<AnimationPlayer>("Visuals/YBot/AnimationPlayer");
+        _animTree = GetNode<AnimationTree>("Visuals/YBot/AnimationTree");
+        _animTree.Active = true;
         _lookAnchor = GetNode<Marker3D>("%LookAnchor");
 
         _springArmPivot = GetNode<Node3D>("SpringArmPivot");
@@ -117,37 +124,20 @@ public partial class PlayerController : CharacterBody3D
             .Normalized();
         if (direction != Vector3.Zero)
         {
-            if (!IsVaping)
-            {
-                if (is_running)
-                {
-                    if (_animation_player.GetCurrentAnimation() != "running")
-                    {
-                        _animation_player.Play("Jogging/mixamo_com");
-                    }
-                }
-                else
-                {
-                    if (_animation_player.GetCurrentAnimation() != "walking")
-                    {
-                        _animation_player.Play("Walking/mixamo_com");
-                    }
-                }
-            }
-
             velocity.X = direction.X * Speed;
             velocity.Z = direction.Z * Speed;
         }
         else
         {
-            if (!IsVaping && _animation_player.GetCurrentAnimation() != "idle")
-            {
-                _animation_player.Play("StandIdle/mixamo_com");
-            }
-
             velocity.X = Mathf.MoveToward(Velocity.X, 0, Speed);
             velocity.Z = Mathf.MoveToward(Velocity.Z, 0, Speed);
         }
+
+        string locomotionState = direction == Vector3.Zero ? "Idle" : (is_running ? "Run" : "Walk");
+        _animTree.Set(LocomotionRequestParam, locomotionState);
+
+        _vapeArmBlend = Mathf.MoveToward(_vapeArmBlend, IsVaping ? 1f : 0f, VapeArmRaiseSpeed * (float)delta);
+        _animTree.Set(VapeBlendParam, Mathf.SmoothStep(0f, 1f, _vapeArmBlend));
 
         Velocity = velocity;
         UpdateCharacterFacing(direction);
@@ -164,9 +154,6 @@ public partial class PlayerController : CharacterBody3D
         if (isVapingPressed)
         {
             _vapingSanityModifierHandle = Sanity.AddRateModifier(VapingSanityRecoveryRate);
-            // SEAM: Whole-body looping is provisional. Replace with layered vaping
-            // animation later; IsVaping and sanity recovery remain gameplay-owned.
-            _animation_player.Play("Smoking/mixamo_com");
         }
         else
         {
