@@ -44,6 +44,16 @@ public partial class PlayerController : CharacterBody3D
     private static readonly StringName LocomotionRequestParam = "parameters/Locomotion/transition_request";
     private static readonly StringName VapeBlendParam = "parameters/VapeBlend/blend_amount";
 
+    // Input actions defined in Project Settings > Input Map. They must match exactly.
+    private static readonly StringName SmokeAction = "smoke";
+    private static readonly StringName RunAction = "run";
+    private static readonly StringName JumpAction = "ui_accept";
+    private static readonly StringName MoveLeftAction = "move_left";
+    private static readonly StringName MoveRightAction = "move_right";
+    private static readonly StringName MoveForwardAction = "move_forward";
+    private static readonly StringName MoveBackwardAction = "move_backward";
+    private static readonly StringName TogglePerspectiveAction = "toggle_perspective";
+
     public override void _Ready()
     {
         if (!float.IsFinite(VapingSanityRecoveryRate) || VapingSanityRecoveryRate < 0f)
@@ -79,7 +89,7 @@ public partial class PlayerController : CharacterBody3D
         }
 
         // Toggle between first- and third-person view
-        if (@event.IsActionPressed("toggle_perspective"))
+        if (@event.IsActionPressed(TogglePerspectiveAction))
         {
             _firstPerson = !_firstPerson;
             ApplyPerspective();
@@ -89,10 +99,10 @@ public partial class PlayerController : CharacterBody3D
     public override void _PhysicsProcess(double delta)
     {
         // Handle vaping
-        HandleVaping(GetWindow().HasFocus() && Input.IsActionPressed("smoke"));
+        HandleVaping(GetWindow().HasFocus() && Input.IsActionPressed(SmokeAction));
 
         // Handle running
-        if (Input.IsActionPressed("run"))
+        if (Input.IsActionPressed(RunAction))
         {
             Speed = RunningSpeed;
             is_running = true;
@@ -112,13 +122,13 @@ public partial class PlayerController : CharacterBody3D
         }
 
         // Handle Jump.
-        if (Input.IsActionJustPressed("ui_accept") && IsOnFloor())
+        if (Input.IsActionJustPressed(JumpAction) && IsOnFloor())
         {
             velocity.Y = JumpVelocity;
         }
 
         // Get the input direction (relative to where the camera is looking) and handle movement/deceleration.
-        Vector2 inputDir = Input.GetVector("move_left", "move_right", "move_forward", "move_backward");
+        Vector2 inputDir = Input.GetVector(MoveLeftAction, MoveRightAction, MoveForwardAction, MoveBackwardAction);
         Vector3 direction = new Vector3(inputDir.X, 0, inputDir.Y)
             .Rotated(Vector3.Up, _springArmPivot.GlobalRotation.Y)
             .Normalized();
