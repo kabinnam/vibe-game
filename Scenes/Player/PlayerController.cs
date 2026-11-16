@@ -45,7 +45,7 @@ public partial class PlayerController : CharacterBody3D
     private static readonly StringName VapeBlendParam = "parameters/VapeBlend/blend_amount";
 
     // Input actions defined in Project Settings > Input Map. They must match exactly.
-    private static readonly StringName SmokeAction = "smoke";
+    private static readonly StringName InhaleAction = "inhale";
     private static readonly StringName RunAction = "run";
     private static readonly StringName JumpAction = "ui_accept";
     private static readonly StringName MoveLeftAction = "move_left";
@@ -99,7 +99,7 @@ public partial class PlayerController : CharacterBody3D
     public override void _PhysicsProcess(double delta)
     {
         // Handle vaping
-        HandleVaping(GetWindow().HasFocus() && Input.IsActionPressed(SmokeAction));
+        HandleVaping(GetWindow().HasFocus() && Input.IsActionPressed(InhaleAction));
 
         // Handle running
         if (Input.IsActionPressed(RunAction))
