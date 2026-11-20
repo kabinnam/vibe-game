@@ -9,21 +9,27 @@ public partial class Main : Node3D
     [Export] public float LevelDurationSeconds { get; set; } = 300f; // 5 minutes
 
     private Sanity _sanity;
+    private Lungs _lungs;
     private HUD _hud;
     private float _timeRemaining;
     private bool _ended;
 
     public override void _Ready()
     {
-        _sanity = GetNode<PlayerController>("Player").Sanity;
+        PlayerController player = GetNode<PlayerController>("Player");
+        _sanity = player.Sanity;
+        _lungs = player.Lungs;
         _hud = GetNode<HUD>("HUD");
 
         _sanity.ValueChanged += _hud.SetSanity;
+        _lungs.VolumeChanged += _hud.SetLungsVolume;
         _sanity.Exhausted += EndRun;
 
         // Children _Ready first, so Sanity's initial ValueChanged already fired; seed by hand.
         _hud.SanityMax = _sanity.Max;
         _hud.SetSanity(_sanity.CurrentValue);
+        _hud.LungsCapacity = _lungs.Capacity;
+        _hud.SetLungsVolume(_lungs.Volume);
 
         _timeRemaining = Mathf.Max(LevelDurationSeconds, 0.01f);
         _hud.SetTimeRemaining(_timeRemaining);
@@ -32,6 +38,7 @@ public partial class Main : Node3D
     public override void _ExitTree()
     {
         _sanity.ValueChanged -= _hud.SetSanity;
+        _lungs.VolumeChanged -= _hud.SetLungsVolume;
         _sanity.Exhausted -= EndRun;
     }
 
