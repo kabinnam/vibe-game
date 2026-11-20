@@ -15,13 +15,13 @@ public partial class Lungs : Node
 
     [Signal] public delegate void StateChangedEventHandler(BreathState state);
     [Signal] public delegate void VolumeChangedEventHandler(float volume);
-    [Signal] public delegate void HoldTimeChangedEventHandler(float seconds);
+    [Signal] public delegate void BreathHoldTimeChangedEventHandler(float seconds);
 
     [ExportGroup("Config")]
     [Export] public float Capacity { get; set; } = 100f;
-    [Export] public float InhaleRate { get; set; } = 25f;      // volume per second
-    [Export] public float ExhaleRate { get; set; } = 50f;      // volume per second
-    [Export] public float MaxHoldSeconds { get; set; } = 8f;   // counted from inhale start
+    [Export] public float InhaleRate { get; set; } = 25f;            // volume per second
+    [Export] public float ExhaleRate { get; set; } = 50f;            // volume per second
+    [Export] public float MaxBreathHoldSeconds { get; set; } = 8f;   // counted from inhale start
 
     public BreathState State { get; private set; } = BreathState.Idle;
     private bool _inhaleRequested;
@@ -44,21 +44,21 @@ public partial class Lungs : Node
         }
     }
 
-    private float _holdTime;
-    public float HoldTime
+    private float _breathHoldTime;
+    public float BreathHoldTime
     {
-        get => _holdTime;
+        get => _breathHoldTime;
         private set
         {
-            float nextValue = Mathf.Clamp(value, 0f, MaxHoldSeconds);
+            float nextValue = Mathf.Clamp(value, 0f, MaxBreathHoldSeconds);
 
-            if (nextValue == _holdTime)
+            if (nextValue == _breathHoldTime)
             {
                 return;
             }
 
-            _holdTime = nextValue;
-            EmitSignal(SignalName.HoldTimeChanged, nextValue);
+            _breathHoldTime = nextValue;
+            EmitSignal(SignalName.BreathHoldTimeChanged, nextValue);
         }
     }
 
@@ -95,8 +95,9 @@ public partial class Lungs : Node
         Validate(float.IsFinite(ExhaleRate) && ExhaleRate > 0f,
             "ExhaleRate must be finite and greater than zero.");
 
-        Validate(float.IsFinite(MaxHoldSeconds) && MaxHoldSeconds > Capacity / InhaleRate,
-            "MaxHoldSeconds must be finite and longer than Capacity / InhaleRate.");
+        Validate(float.IsFinite(MaxBreathHoldSeconds)
+            && MaxBreathHoldSeconds > Capacity / InhaleRate,
+            "MaxBreathHoldSeconds must be finite and longer than Capacity / InhaleRate.");
 
         static void Validate(bool condition, string message)
         {
@@ -118,7 +119,7 @@ public partial class Lungs : Node
 
         if (next == BreathState.Exhaling)
         {
-            HoldTime = 0f;
+            BreathHoldTime = 0f;
         }
 
         EmitSignal(SignalName.StateChanged, Variant.From(next));
@@ -145,9 +146,9 @@ public partial class Lungs : Node
                 }
 
                 Volume += InhaleRate * elapsed;
-                HoldTime += elapsed;
+                BreathHoldTime += elapsed;
 
-                if (HoldTime >= MaxHoldSeconds)
+                if (BreathHoldTime >= MaxBreathHoldSeconds)
                 {
                     Exhale();
                 }
@@ -158,9 +159,9 @@ public partial class Lungs : Node
                 break;
 
             case BreathState.Holding:
-                HoldTime += elapsed;
+                BreathHoldTime += elapsed;
 
-                if (HoldTime >= MaxHoldSeconds)
+                if (BreathHoldTime >= MaxBreathHoldSeconds)
                 {
                     Exhale();
                 }
