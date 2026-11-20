@@ -23,6 +23,7 @@ public partial class Main : Node3D
 
         _sanity.ValueChanged += _hud.SetSanity;
         _lungs.VolumeChanged += _hud.SetLungsVolume;
+        _lungs.BreathHoldTimeChanged += _hud.SetBreathHoldTime;
         _sanity.Exhausted += EndRun;
 
         // Children _Ready first, so Sanity's initial ValueChanged already fired; seed by hand.
@@ -30,6 +31,8 @@ public partial class Main : Node3D
         _hud.SetSanity(_sanity.CurrentValue);
         _hud.LungsCapacity = _lungs.Capacity;
         _hud.SetLungsVolume(_lungs.Volume);
+        _hud.MaxBreathHoldSeconds = _lungs.MaxBreathHoldSeconds;
+        _hud.SetBreathHoldTime(_lungs.BreathHoldTime);
 
         _timeRemaining = Mathf.Max(LevelDurationSeconds, 0.01f);
         _hud.SetTimeRemaining(_timeRemaining);
@@ -39,6 +42,7 @@ public partial class Main : Node3D
     {
         _sanity.ValueChanged -= _hud.SetSanity;
         _lungs.VolumeChanged -= _hud.SetLungsVolume;
+        _lungs.BreathHoldTimeChanged -= _hud.SetBreathHoldTime;
         _sanity.Exhausted -= EndRun;
     }
 
