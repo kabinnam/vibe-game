@@ -34,6 +34,7 @@ public partial class PlayerController : CharacterBody3D
     public Vector3 LookAnchorPosition => _lookAnchor.GlobalPosition;
     public bool IsVaping { get; private set; }
     public Sanity Sanity { get; private set; }
+    public Lungs Lungs { get; private set; }
 
     private Node3D _springArmPivot;
     private SpringArm3D _springArm;
@@ -46,6 +47,7 @@ public partial class PlayerController : CharacterBody3D
 
     // Input actions defined in Project Settings > Input Map. They must match exactly.
     private static readonly StringName InhaleAction = "inhale";
+    private static readonly StringName ExhaleAction = "exhale";
     private static readonly StringName RunAction = "run";
     private static readonly StringName JumpAction = "ui_accept";
     private static readonly StringName MoveLeftAction = "move_left";
@@ -61,6 +63,8 @@ public partial class PlayerController : CharacterBody3D
             throw new InvalidOperationException("PlayerController: VapingSanityRecoveryRate must be finite and non-negative.");
         }
         Sanity = GetNode<Sanity>("Sanity");
+        Lungs = GetNode<Lungs>("Lungs");
+        Lungs.StateChanged += OnLungsStateChanged;
 
         Input.MouseMode = Input.MouseModeEnum.Captured;
         _visuals = GetNode<Node3D>("Visuals");
@@ -74,6 +78,11 @@ public partial class PlayerController : CharacterBody3D
         _camera.Current = true;
 
         ApplyPerspective();
+    }
+
+    public override void _ExitTree()
+    {
+        Lungs.StateChanged -= OnLungsStateChanged;
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -94,12 +103,18 @@ public partial class PlayerController : CharacterBody3D
             _firstPerson = !_firstPerson;
             ApplyPerspective();
         }
+
+        // Exhale the current breath
+        if (@event.IsActionPressed(ExhaleAction))
+        {
+            Lungs.Exhale();
+        }
     }
 
     public override void _PhysicsProcess(double delta)
     {
         // Handle vaping
-        HandleVaping(GetWindow().HasFocus() && Input.IsActionPressed(InhaleAction));
+        HandleVaping((float)delta);
 
         // Handle running
         if (Input.IsActionPressed(RunAction))
@@ -146,22 +161,30 @@ public partial class PlayerController : CharacterBody3D
         string locomotionState = direction == Vector3.Zero ? "Idle" : (is_running ? "Run" : "Walk");
         _animTree.Set(LocomotionRequestParam, locomotionState);
 
-        _vapeArmBlend = Mathf.MoveToward(_vapeArmBlend, IsVaping ? 1f : 0f, VapeArmRaiseSpeed * (float)delta);
-        _animTree.Set(VapeBlendParam, Mathf.SmoothStep(0f, 1f, _vapeArmBlend));
-
         Velocity = velocity;
         UpdateCharacterFacing(direction);
         MoveAndSlide();
     }
 
-    private void HandleVaping(bool isVapingPressed)
+    private void HandleVaping(float delta)
     {
-        if (IsVaping == isVapingPressed)
+        IsVaping = GetWindow().HasFocus() && Input.IsActionPressed(InhaleAction);
+        _vapeArmBlend = Mathf.MoveToward(_vapeArmBlend, IsVaping ? 1f : 0f, VapeArmRaiseSpeed * delta);
+        _animTree.Set(VapeBlendParam, Mathf.SmoothStep(0f, 1f, _vapeArmBlend));
+        Lungs.SetInhaleRequested(IsVaping && _vapeArmBlend >= 1f);
+    }
+
+    private void OnLungsStateChanged(Lungs.BreathState state)
+    {
+        bool shouldRecoverSanity = state == Lungs.BreathState.Inhaling;
+        bool isRecoveringSanity = _vapingSanityModifierHandle != Guid.Empty;
+
+        if (shouldRecoverSanity == isRecoveringSanity)
         {
             return;
         }
 
-        if (isVapingPressed)
+        if (shouldRecoverSanity)
         {
             _vapingSanityModifierHandle = Sanity.AddRateModifier(VapingSanityRecoveryRate);
         }
@@ -170,9 +193,8 @@ public partial class PlayerController : CharacterBody3D
             Sanity.RemoveRateModifier(_vapingSanityModifierHandle);
             _vapingSanityModifierHandle = Guid.Empty;
         }
-
-        IsVaping = isVapingPressed;
     }
+
     private void ApplyPerspective()
     {
         if (_firstPerson)
